@@ -800,6 +800,84 @@ fi
 
 
 ################################################################################
+# activate torrent
+if [ "$TORRENT" = "1" ]; then
+
+ echo
+ echo "####"
+ echo "#### Activating LINBO's torrent"
+ echo "####"
+
+ changed=""
+ msg="Working on configfiles:"
+ CONF=/etc/default/bittorrent
+ . $CONF
+ if [ "$START_BTTRACK" != "1" ]; then
+  echo "$msg"
+  changed=yes
+  echo -n " * `basename $CONF` ..."
+  cp $CONF $CONF.migration
+  if sed -e 's|^START_BTTRACK=.*|START_BTTRACK=1|' -i $CONF; then
+   echo " OK!"
+  else
+   echo " Failed!"
+  fi
+ fi
+
+ CONF=/etc/defaultlinbo-/bittorrent
+ . $CONF
+ if [ "$START_BITTORRENT" != "1" ]; then
+  if [ -z "$changed" ]; then
+   echo "$msg"
+   changed=yes
+  fi
+  echo -n " * `basename $CONF` ..."
+  cp $CONF $CONF.migration
+  if sed -e 's|^START_BITTORRENT=.*|START_BITTORRENT=1|' -i $CONF; then
+   echo " OK!"
+  else
+   echo " Failed!"
+  fi
+ fi
+
+ trange="6881:6969"
+ if ! grep -q ^tcp $ALLOWEDPORTS | grep "$trange"; then
+  if [ -z "$changed" ]; then
+   echo "$msg"
+   changed=yes
+  fi
+  echo -n " * `basename $ALLOWEDPORTS` ..."
+  newports="$(grep ^tcp $ALLOWEDPORTS | awk '{ print $2 }'),$trange"
+  cp $ALLOWEDPORTS $ALLOWEDPORTS.migration
+  if sed -e "s|^tcp .*|tcp $newports|" -i $ALLOWEDPORTS; then
+   echo " OK!"
+  else
+   echo " Failed!"
+  fi
+ fi
+
+ mkdir -p $LINBODIR/backup
+ for i in $LINBODIR/start.conf.*; do
+  dltype="$(grep -i ^downloadtype $i | awk -F\= '{ print $2 }' | awk '{ print $1 }' | tr A-Z a-z)"
+  if [ "$dltype" != "torrent" ]; then
+   if [ -z "$changed" ]; then
+    echo "$msg"
+    changed=yes
+   fi
+   echo -n " `basename $i` ..."
+   cp "$i" "$LINBODIR/backup"
+   if sed -e "s|^\[[Dd][Oo][Ww][Nn][Ll][Oo][Aa][Dd][Tt][Yy][Pp][Ee]\].*|DownloadType = torrent |g" -i $i; then  
+    echo " OK!"
+   else
+    echo " Failed!"
+   fi
+  fi
+ done
+
+fi
+
+
+################################################################################
 # change config values defined in custom.conf
 
 if [ -e "$CUSTOMFLAG" ]; then
@@ -887,84 +965,6 @@ if [ -e "$CUSTOMFLAG" ]; then
  fi
 
 fi # custom
-
-
-################################################################################
-# activate torrent
-if [ "$TORRENT" = "1" ]; then
-
- echo
- echo "####"
- echo "#### Activating LINBO's torrent"
- echo "####"
-
- changed=""
- msg="Working on configfiles:"
- CONF=/etc/default/bittorrent
- . $CONF
- if [ "$START_BTTRACK" != "1" ]; then
-  echo "$msg"
-  changed=yes
-  echo -n " * `basename $CONF` ..."
-  cp $CONF $CONF.migration
-  if sed -e 's|^START_BTTRACK=.*|START_BTTRACK=1|' -i $CONF; then
-   echo " OK!"
-  else
-   echo " Failed!"
-  fi
- fi
-
- CONF=/etc/defaultlinbo-/bittorrent
- . $CONF
- if [ "$START_BITTORRENT" != "1" ]; then
-  if [ -z "$changed" ]; then
-   echo "$msg"
-   changed=yes
-  fi
-  echo -n " * `basename $CONF` ..."
-  cp $CONF $CONF.migration
-  if sed -e 's|^START_BITTORRENT=.*|START_BITTORRENT=1|' -i $CONF; then
-   echo " OK!"
-  else
-   echo " Failed!"
-  fi
- fi
-
- trange="6881:6969"
- if ! grep -q ^tcp $ALLOWEDPORTS | grep "$trange"; then
-  if [ -z "$changed" ]; then
-   echo "$msg"
-   changed=yes
-  fi
-  echo -n " * `basename $ALLOWEDPORTS` ..."
-  newports="$(grep ^tcp $ALLOWEDPORTS | awk '{ print $2 }'),$trange"
-  cp $ALLOWEDPORTS $ALLOWEDPORTS.migration
-  if sed -e "s|^tcp .*|tcp $newports|" -i $ALLOWEDPORTS; then
-   echo " OK!"
-  else
-   echo " Failed!"
-  fi
- fi
-
- mkdir -p $LINBODIR/backup
- for i in $LINBODIR/start.conf.*; do
-  dltype="$(grep -i ^downloadtype $i | awk -F\= '{ print $2 }' | awk '{ print $1 }' | tr A-Z a-z)"
-  if [ "$dltype" != "torrent" ]; then
-   if [ -z "$changed" ]; then
-    echo "$msg"
-    changed=yes
-   fi
-   echo -n " `basename $i` ..."
-   cp "$i" "$LINBODIR/backup"
-   if sed -e "s|^\[[Dd][Oo][Ww][Nn][Ll][Oo][Aa][Dd][Tt][Yy][Pp][Ee]\].*|DownloadType = torrent |g" -i $i; then  
-    echo " OK!"
-   else
-    echo " Failed!"
-   fi
-  fi
- done
-
-fi
 
 
 ################################################################################
