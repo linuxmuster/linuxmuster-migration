@@ -1,3 +1,9 @@
+linuxmuster-migration (1.0.2-0) unstable; urgency=low
+
+  * linuxmuster-migration-restore.sh: added integer check for quota.
+
+ -- Thomas Schmitt <tschmitt@build>  Fri, 14 Oct 2011 21:04:48 +0200
+
 linuxmuster-migration (1.0.1-0) unstable; urgency=low
 
   * added quota handling.
