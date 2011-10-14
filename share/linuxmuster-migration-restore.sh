@@ -1107,6 +1107,7 @@ if [ $quotaparts -gt 0 ]; then
     quota_old="$(echo "$line" | awk -F \; '{ print $8 }' | awk '{ print $1 }')"
 
     stringinstring "+" "$quota_old" && continue
+    isinteger "$quota_old" || continue
 
     quota_new="${quota_old}+$TDEFAULT"
     line_new="$(echo "$line" | sed -e "s|\;${quota_old}|\;${quota_new}|")"
