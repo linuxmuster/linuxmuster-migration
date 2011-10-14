@@ -66,7 +66,7 @@ echo "####" | tee -a "$MIGBACKLOG"
 
 
 # concenate system and user config files
-concenate_configs | tee -a "$MIGBACKLOG"
+concenate_configs || error " Failed!" | tee -a "$MIGBACKLOG"
 
 
 # source backup script

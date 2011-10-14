@@ -71,7 +71,7 @@ echo "####" | tee -a "$MIGRESTLOG"
 # concenate config files
 MIGEXUSER="$MIGCONFDIR/exclude.conf"
 MIGINUSER="$MIGCONFDIR/include.conf"
-concenate_configs | tee -a "$MIGRESTLOG"
+concenate_configs || error " Failed!" | tee -a "$MIGRESTLOG"
 
 
 # check for custom.conf and read it
