@@ -22,13 +22,12 @@ echo "####"
 
 # add all file sizes to SUM
 ssum=0 ; tsum=0 ; s=0 ; t=0
-BACKUP="$(grep ^/ "$INCONF")"
-rm -f "$INCONFTMP"
+BACKUP="$(grep ^/ "$INCONFTMP")"
 for i in $BACKUP; do
  #  source space
  if [ -e "$i" ]; then
-  # on this occasion write only the really existent files to INCONF.tmp for use with rsync
-  echo "$i" >> "$INCONFTMP"
+  # on this occasion write only the really existent files to INCONFILTERED for use with rsync
+  echo "$i" >> "$INCONFILTERED"
   s="$(du -sk "$i" | awk '{ print $1 }')"
   ssum=$(( $s + $ssum ))
  fi
@@ -188,8 +187,6 @@ done
 
 mkdir -p "$BACKUPFOLDER"
 rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || RC=1
-rm -f "$INCONFTMP"
-rm -f "$EXCONFTMP"
 
 # start services again
 for i in /etc/rc2.d/S*; do

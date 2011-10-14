@@ -71,7 +71,7 @@ echo "####" | tee -a "$MIGRESTLOG"
 # concenate config files
 MIGEXUSER="$MIGCONFDIR/exclude.conf"
 MIGINUSER="$MIGCONFDIR/include.conf"
-concenate_configs || error "Failed to create temporary config files." | tee -a "$MIGRESTLOG"
+concenate_configs | tee -a "$MIGRESTLOG"
 
 
 # check for custom.conf and read it
@@ -93,4 +93,10 @@ internsubrange_old="$(echo get linuxmuster-base/internsubrange | debconf-communi
 # source restore script
 . "$MIGDATADIR/linuxmuster-migration-restore.sh" | tee -a "$MIGRESTLOG"
 cp -f "$MIGRESTLOG" "$SOURCEDIR"
+
+
+# clean up
+rm -f "$EXCONFTMP"
+rm -f "$INCONFTMP"
+rm -f "$INCONFILTERED"
 

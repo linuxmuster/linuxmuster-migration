@@ -666,10 +666,9 @@ domainname="$(dnsdomainname)"
 cyradmpw="$(cat /etc/imap.secret)"
 
 # filter out non existing files from include.conf
-rm -f "$INCONFTMP"
-BACKUP="$(grep ^/ "$INCONF")"
+BACKUP="$(grep ^/ "$INCONFTMP")"
 for i in $BACKUP; do
- [ -e "${BACKUPFOLDER}${i}" ] && echo "$i" >> "$INCONFTMP"
+ [ -e "${BACKUPFOLDER}${i}" ] && echo "$i" >> "$INCONFILTERED"
 done
 
 # stop services
@@ -686,7 +685,6 @@ if [ "$RC" = "0" ]; then
 else
  echo "Restore finished with error!"
 fi
-rm -f "$INCONFTMP"
 
 # upgrade 4.0.x configuration
 OLDVERSION="$(awk '{ print $3 }' "$ISSUE")"
