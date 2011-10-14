@@ -1,0 +1,13 @@
+Source: linuxmuster-migration
+Section: debian-linuxmuster
+Priority: optional
+Maintainer: Thomas Schmitt <schmitt@lmz-bw.de>
+Build-Depends: debhelper (>= 4.0.0)
+Standards-Version: 3.6.0
+
+Package: linuxmuster-migration
+Architecture: all
+Depends: ${misc:Depends}, rsync, linuxmuster-base
+Description: paedML Linux data migration scripts
+ This package provides data migration scripts for paedML/openML Linux.
+

@@ -1,0 +1,96 @@
+#!/bin/sh
+#
+# $Id$
+#
+
+
+# read paedml specific environment
+. /usr/share/linuxmuster/config/dist.conf || exit 1
+. $HELPERFUNCTIONS || exit 1
+. $DATADIR/migration/defaults.conf || exit 1
+
+
+# print help
+usage(){
+ echo
+ echo "Usage: `basename $0` <options>"
+ echo
+ echo "Options:"
+ echo
+ echo " -c <config dir>     Path to directory with config files (optional)."
+ echo "                     Per default we look in source dir for them."
+ echo " -d <source dir>     Path to source directory (mandatory,"
+ echo "                     where the restore files live)."
+ echo " -i <password>       Firewall root password (optional)."
+ echo " -h                  Show this help."
+ exit 1
+}
+
+
+# parse commandline arguments
+while getopts ":c:d:hi:" opt; do
+ case $opt in
+  c) ALTCONFDIR="$OPTARG" ;;
+  d) SOURCEDIR="$OPTARG" ;;
+  i) ipcoppw="$OPTARG" ;;
+  h) usage ;;
+  \?) echo "Invalid option: -$OPTARG" >&2
+      usage ;;
+  :) echo "Option -$OPTARG requires an argument." >&2
+     usage ;;
+ esac
+done
+
+
+# check args
+[ -z "$SOURCEDIR" ] && usage
+[ -d "$SOURCEDIR" ] || usage
+if [ -n "$ALTCONFDIR" ]; then
+ [ -d "$ALTCONFDIR" ] || usage
+ MIGCONFDIR="$ALTCONFDIR"
+else
+ MIGCONFDIR="$SOURCEDIR"
+fi
+cd "$SOURCEDIR" || usage
+
+
+# delete old logfile
+rm -f "$MIGRESTLOG"
+
+
+# print script header info
+echo
+echo "####" | tee -a "$MIGRESTLOG"
+echo "#### Starting restore of migration data" | tee -a "$MIGRESTLOG"
+echo "#### Sourcedir: $SOURCEDIR" | tee -a "$MIGRESTLOG"
+echo "#### Configdir: $MIGCONFDIR" | tee -a "$MIGRESTLOG"
+echo "#### `date`" | tee -a "$MIGRESTLOG"
+echo "####" | tee -a "$MIGRESTLOG"
+
+
+# concenate config files
+MIGEXUSER="$MIGCONFDIR/exclude.conf"
+MIGINUSER="$MIGCONFDIR/include.conf"
+concenate_configs || error "Failed to create temporary config files." | tee -a "$MIGRESTLOG"
+
+
+# check for custom.conf and read it
+if [ -s "$MIGCONFDIR/custom.conf" ]; then
+ echo -n "Reading $MIGCONFDIR/custom.conf ..." | tee -a "$MIGRESTLOG"
+ if . "$MIGCONFDIR/custom.conf"; then
+  echo " OK!" | tee -a "$MIGRESTLOG"
+ else
+  error " Failed!" | tee -a "$MIGRESTLOG"
+ fi
+fi
+
+
+# keep old internsubrange, we need it later if it has to be changed during migration
+internsubrange_old="$(echo get linuxmuster-base/internsubrange | debconf-communicate | awk '{ print $2 }')"
+[ -z "$internsubrange_old" ] && error "Cannot get internsubrange value from debconf!" | tee -a "$MIGRESTLOG"
+
+
+# source restore script
+. "$MIGDATADIR/linuxmuster-migration-restore.sh" | tee -a "$MIGRESTLOG"
+cp -f "$MIGRESTLOG" "$SOURCEDIR"
+

@@ -1,0 +1,4 @@
+etc/*		etc/linuxmuster/migration/
+share/*		usr/share/linuxmuster/migration/
+sbin/*		usr/sbin/
+
