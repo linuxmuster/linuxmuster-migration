@@ -1,3 +1,10 @@
+linuxmuster-migration (1.0.1-0) unstable; urgency=low
+
+  * added quota handling.
+  * minor fixes.
+
+ -- Thomas Schmitt <schmitt@lmz-bw-de>  Fri, 14 Oct 2011 20:41:30 +0200
+
 linuxmuster-migration (1.0.0-0) unstable; urgency=low
 
   * intial release

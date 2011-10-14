@@ -107,6 +107,14 @@ else
  error " Failed!"
 fi
 
+# save number of quoted partitions
+echo -n " * quota info ..."
+if mount | grep -c "usrquota,grpquota" > "$QUOTAPARTS"; then
+ echo " OK!"
+else
+ error " Failed!"
+fi
+
 
 ################################################################################
 # ipcop settings, certificates etc.

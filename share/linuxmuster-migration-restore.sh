@@ -7,7 +7,7 @@ echo
 echo "####"
 echo "#### Checking for essential restore files"
 echo "####"
-for i in "$BACKUPFOLDER" "$BASEDATAFILE" "$LDIF" "$FWTYPE" "$FWARCHIVE" "$ISSUE" "$PGSQLMETA" "$MYSQLMETA" "$SELECTIONS"; do
+for i in "$BACKUPFOLDER" "$BASEDATAFILE" "$LDIF" "$FWTYPE" "$FWARCHIVE" "$ISSUE" "$PGSQLMETA" "$MYSQLMETA" "$SELECTIONS" "$QUOTAPARTS"; do
  if [ -e "$i" ]; then
   echo " * $i ... OK!"
  else
@@ -673,6 +673,10 @@ for i in $BACKUP; do
  [ -e "${BACKUPFOLDER}${i}" ] && echo "$i" >> "$INCONFILTERED"
 done
 
+# save quota.txt
+CONF=/etc/sophomorix/user/quota.txt
+cp "$CONF" "$CONF.migration.old"
+
 # stop services
 for i in /etc/rc0.d/K*; do
  for s in $SERVICES; do
@@ -824,7 +828,7 @@ if [ "$TORRENT" = "1" ]; then
   fi
  fi
 
- CONF=/etc/defaultlinbo-/bittorrent
+ CONF=/etc/default/linbo-bittorrent
  . $CONF
  if [ "$START_BITTORRENT" != "1" ]; then
   if [ -z "$changed" ]; then
@@ -903,6 +907,7 @@ if [ -e "$CUSTOMFLAG" ]; then
  echo " Done!"
 
  echo "Looking for modifications ..."
+ changed=""
 
  if [ -n "$COUNTRY" -a "$COUNTRY" != "$country_old" ]; then
   echo " * COUNTRY: $country_old --> $COUNTRY"
@@ -965,6 +970,168 @@ if [ -e "$CUSTOMFLAG" ]; then
  fi
 
 fi # custom
+
+
+################################################################################
+# quota
+
+echo
+echo "####"
+echo "#### Checking quota"
+echo "####"
+
+# determine number of quoted partitions on target
+quotaparts="$(mount | grep -c "usrquota,grpquota")"
+[ $quotaparts -gt 2 ] && quotaparts=2
+if [ $quotaparts -gt 0 ]; then
+
+ # get number of quoted partitions from source
+ quotaparts_old="$(cat "$QUOTAPARTS")"
+ if [ $quotaparts -ne $quotaparts_old ]; then
+
+  echo "Your quota configuration is different from source."
+  echo "Quota partition(s) on source: $quotaparts_old."
+  echo "Quota partition(s) on target: $quotaparts."
+  echo "We try to adjust it accordingly."
+  echo "Please check your quota settings after migration has finished."
+  sleep 3
+
+  CONF=/etc/sophomorix/user/quota.txt
+  TCONF=/etc/sophomorix/user/lehrer.txt
+  cp "$CONF" "$CONF.migration"
+  cp "$TCONF" "$TCONF.migration"
+
+  if [ $quotaparts_old -eq 0 ]; then
+   # copy default quota.txt if no quota were set on source
+   echo -n " * using defaults for $quotaparts partition(s) ..."
+   if cp "${STATICTPLDIR}${CONF}.$quotaparts" "$CONF"; then
+    echo " OK!"
+   else
+    error " Failed!"
+   fi
+
+  elif [ $quotaparts -eq 1 ]; then
+   # reduce quota to one partition
+
+   # work on quota.txt
+   echo -n "Checking `basename "$CONF"` ..."
+   changed=""
+   grep ^[a-zA-Z] "$CONF.migration" | while read line; do
+    user="$(echo "$line" | awk -F \: '{ print $1 }')"
+    quota_old="$(echo "$line" | awk -F \: '{ print $2 }' | awk '{ print $1 }')"
+    quota1="$(echo "$quota_old" | awk -F \+ '{ print $1 }')"
+    quota2="$(echo "$quota_old" | awk -F \+ '{ print $2 }')"
+    [ -z "$quota2" ] && continue
+    if ! quota_new=$(( $quota1 +  $quota2 )); then
+     error " Failed!"
+    fi
+    if [ -z "$changed" ]; then
+     echo
+     changed=yes
+    fi
+    echo -n " * $user: $quota_old --> $quota_new ..."
+    if sed -e "s|^${user}:.*|${user}: $quota_new|" -i "$CONF"; then
+     echo " OK!"
+    else
+     error " Failed!"
+    fi
+   done
+   [ -z "$changed" ] && echo " nothing to do."
+
+   # work on lehrer.txt
+   echo -n "Checking `basename "$TCONF"` ..."
+   changed=""
+   grep ^[a-zA-Z] "$TCONF.migration" | while read line; do
+    user="$(echo "$line" | awk -F \; '{ print $5 }' | awk '{ print $1 }')"
+    quota_old="$(echo "$line" | awk -F \; '{ print $8 }' | awk '{ print $1 }')"
+    quota1="$(echo "$quota_old" | awk -F \+ '{ print $1 }')"
+    quota2="$(echo "$quota_old" | awk -F \+ '{ print $2 }')"
+    [ -z "$quota2" ] && continue
+    if ! quota_new=$(( $quota1 +  $quota2 )); then
+     error " Failed!"
+    fi
+    line_new="$(echo "$line" | sed -e "s|\;${quota_old}|\;${quota_new}|")"
+    if [ -z "$changed" ]; then
+     echo
+     changed=yes
+    fi
+    echo -n " * $user: $quota_old --> $quota_new ..."
+    if sed -e "s|$line|$line_new|" -i "$TCONF"; then
+     echo " OK!"
+    else
+     error " Failed!"
+    fi
+   done
+   [ -z "$changed" ] && echo " nothing to do."
+
+  else # expand quota for second partition
+
+   # work on quota.txt
+   echo -n "Checking `basename "$CONF"` ..."
+
+   # get teachers default quota for second partition from previously backed up config
+   TDEFAULT="$(grep ^standard-lehrer "$CONF.migration.old" | awk -F \: '{ print $2 }' | awk -F\+ '{ print $2 }')"
+   [ -z "$TDEFAULT" ] && TDEFAULT=100
+
+   changed=""
+   grep ^[a-zA-Z] "$CONF.migration" | while read line; do
+    user="$(echo "$line" | awk -F \: '{ print $1 }')"
+    quota_old="$(echo "$line" | awk -F \: '{ print $2 }' | awk '{ print $1 }')"
+    stringinstring "+" "$quota_old" && continue
+
+    case "$user" in
+     standard-lehrer) quota_new="${quota_old}+$TDEFAULT" ;;
+     www-data) quota_new="0+${quota_old}" ;;
+     *) quota_new="${quota_old}+0" ;;
+    esac
+
+    if [ -z "$changed" ]; then
+     echo
+     changed=yes
+    fi
+    echo -n " * $user: $quota_old --> $quota_new ..."
+    if sed -e "s|^${user}:.*|${user}: $quota_new|" -i "$CONF"; then
+     echo " OK!"
+    else
+     error " Failed!"
+    fi
+   done
+   [ -z "$changed" ] && echo " nothing to do."
+
+   # work on lehrer.txt
+   echo -n "Checking `basename "$TCONF"` ..."
+   changed=""
+
+   grep ^[a-zA-Z] "$TCONF.migration" | while read line; do
+    user="$(echo "$line" | awk -F \; '{ print $5 }' | awk '{ print $1 }')"
+    quota_old="$(echo "$line" | awk -F \; '{ print $8 }' | awk '{ print $1 }')"
+
+    stringinstring "+" "$quota_old" && continue
+
+    quota_new="${quota_old}+$TDEFAULT"
+    line_new="$(echo "$line" | sed -e "s|\;${quota_old}|\;${quota_new}|")"
+
+    if [ -z "$changed" ]; then
+     echo
+     changed=yes
+    fi
+    echo -n " * $user: $quota_old --> $quota_new ..."
+    if sed -e "s|$line|$line_new|" -i "$TCONF"; then
+     echo " OK!"
+    else
+     error " Failed!"
+    fi
+   done
+   [ -z "$changed" ] && echo " nothing to do."
+
+  fi
+
+ fi
+
+fi
+
+# quota update
+sophomorix-quota
 
 
 ################################################################################
