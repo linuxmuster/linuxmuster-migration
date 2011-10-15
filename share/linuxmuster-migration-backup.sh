@@ -39,8 +39,8 @@ for i in $BACKUP; do
   tsum=$(( $t + $tsum ))
  fi
 done
-# add 100 mb to backup size to be sure it fits
-ssum=$(( $ssum + 100000 ))
+# add 200 mb to backup size to be sure it fits
+ssum=$(( $ssum + 200000 ))
 echo " * total backup size      : $ssum kb"
 echo " * already on target      : $tsum kb"
 

@@ -1096,7 +1096,7 @@ if [ $quotaparts -gt 0 ]; then
      error " Failed!"
     fi
    done
-   [ -z "$changed" ] && echo " nothing to do."
+   [ "$changed" = "yes" ] || echo " nothing to do."
 
    # work on lehrer.txt
    echo -n "Checking `basename "$TCONF"` ..."
@@ -1123,7 +1123,7 @@ if [ $quotaparts -gt 0 ]; then
      error " Failed!"
     fi
    done
-   [ -z "$changed" ] && echo " nothing to do."
+   [ "$changed" = "yes" ] || echo " nothing to do."
 
   fi
 
@@ -1167,8 +1167,7 @@ echo "####"
 echo "#### `date`"
 echo -n "#### Finished."
 if [ "$REBOOT" = "1" ]; then
- echo
- echo "Rebooting as requested!"
+ echo " Rebooting as requested!"
  echo "####"
  /sbin/reboot
 else

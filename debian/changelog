@@ -1,3 +1,11 @@
+linuxmuster-migration (1.0.3-0) unstable; urgency=low
+
+  * minor fixes and improvements.
+  * changed exclude.conf concenation to be more compatible to rsync.
+  * updated config files.
+
+ -- Thomas Schmitt <tschmitt@build>  Sat, 15 Oct 2011 11:36:46 +0200
+
 linuxmuster-migration (1.0.2-0) unstable; urgency=low
 
   * linuxmuster-migration-restore.sh: added integer check for quota.
