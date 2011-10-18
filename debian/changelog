@@ -1,3 +1,10 @@
+linuxmuster-migration (1.0.5-0) unstable; urgency=low
+
+  * linuxmuster-migration-restore.sh: added "--no-install-recommends" to dpkg
+    options for deselect upgrade to avoid installation of recommended packages.
+
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Tue, 18 Oct 2011 14:10:29 +0200
+
 linuxmuster-migration (1.0.4-0) unstable; urgency=low
 
   * added 5.0.4 to supported restore versions.
