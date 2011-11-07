@@ -1,5 +1,6 @@
 # $Id$
 
+
 ################################################################################
 # are all necessary files present?
 
@@ -9,9 +10,9 @@ echo "#### Checking for essential restore files"
 echo "####"
 for i in "$BACKUPFOLDER" "$BASEDATAFILE" "$LDIF" "$FWTYPE" "$FWARCHIVE" "$ISSUE" "$PGSQLMETA" "$MYSQLMETA" "$SELECTIONS" "$QUOTAPARTS"; do
  if [ -e "$i" ]; then
-  echo " * $i ... OK!"
+  echo " * `basename $i` ... OK!"
  else
-  error " * $i does not exist!"
+  error " * `basename $i` does not exist!"
  fi
 done
 
@@ -347,12 +348,14 @@ echo
 echo "####"
 echo "#### Linuxmuster-Setup (first)"
 echo "####"
-$SCRIPTSDIR/linuxmuster-patch --first
 
+$SCRIPTSDIR/linuxmuster-patch --first
 
 # refresh environment
 . $HELPERFUNCTIONS
 
+
+################################################################################
 # restore previously backed up settings for ipcop
 
 echo
@@ -367,7 +370,7 @@ else
  error " Failed!"
 fi
 
-echo -n " * unpacking $FWARCHIVE  ..."
+echo -n " * unpacking $FWARCHIVE ..."
 if exec_ipcop "/bin/tar xzf /var/linuxmuster/backup.tar.gz -C / && /sbin/reboot"; then
  echo " OK!"
 else
@@ -968,6 +971,7 @@ if [ -e "$CUSTOMFLAG" ]; then
  if [ -n "$changed" ]; then
   echo "Applying setup modifications, starting linuxmuster-setup (modify) ..."
   RET=`echo set linuxmuster-base/ipcoppw "$ipcoppw" | debconf-communicate`
+
   $SCRIPTSDIR/linuxmuster-patch --modify
  fi
 

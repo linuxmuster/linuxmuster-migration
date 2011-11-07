@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # $Id$
 #
@@ -21,18 +21,23 @@ usage(){
  echo "                     Per default we look in source dir for them."
  echo " -d <source dir>     Path to source directory (mandatory,"
  echo "                     where the restore files live)."
- echo " -i <password>       Firewall root password (optional)."
+ echo " -i <password>       Firewall root password (optional). If not given you"
+ echo "                     will be asked for it."
+ echo " -t <temp dir>       Path to directory where the restore files are"
+ echo "                     temporarily stored in case the source dir is on a"
+ echo "                     nfs share (optional, must exist)."
  echo " -h                  Show this help."
  exit 1
 }
 
 
 # parse commandline arguments
-while getopts ":c:d:hi:" opt; do
+while getopts ":c:d:hi:t:" opt; do
  case $opt in
   c) ALTCONFDIR="$OPTARG" ;;
   d) SOURCEDIR="$OPTARG" ;;
   i) ipcoppw="$OPTARG" ;;
+  t) NFSTMPDIR="$OPTARG" ;;
   h) usage ;;
   \?) echo "Invalid option: -$OPTARG" >&2
       usage ;;
@@ -47,11 +52,10 @@ done
 [ -d "$SOURCEDIR" ] || usage
 if [ -n "$ALTCONFDIR" ]; then
  [ -d "$ALTCONFDIR" ] || usage
- MIGCONFDIR="$ALTCONFDIR"
-else
- MIGCONFDIR="$SOURCEDIR"
 fi
-cd "$SOURCEDIR" || usage
+if [ -n "$NFSTMPDIR" ]; then
+ [ -d "$NFSTMPDIR" ] || usage
+fi
 
 
 # delete old logfile
@@ -64,14 +68,83 @@ echo "####" | tee -a "$MIGRESTLOG"
 echo "#### Starting restore of migration data" | tee -a "$MIGRESTLOG"
 echo "#### Sourcedir: $SOURCEDIR" | tee -a "$MIGRESTLOG"
 echo "#### Configdir: $MIGCONFDIR" | tee -a "$MIGRESTLOG"
+[ -n "$NFSTMPDIR" ] && echo "#### NFS-Tempdir: $NFSTMPDIR" | tee -a "$MIGRESTLOG"
 echo "#### `date`" | tee -a "$MIGRESTLOG"
 echo "####" | tee -a "$MIGRESTLOG"
+
+# nfs check
+RET="$(nfs_check)"
+if [ -n "$RET" ]; then
+ NFSSHARE="$(echo "$RET" | awk '{ print $1 }')"
+ NFSMNTDIR="$(echo "$RET" | awk '{ print $2 }')"
+ NFSTYPE="$(echo "$RET" | awk '{ print $3 }')"
+
+ if [ -n "$NFSSHARE" -a -n "$NFSMNTDIR" -a -n "$NFSTYPE" ]; then
+  echo "$NFSTYPE filesystem $NFSSHARE is mounted on $NFSMNTDIR." | tee -a "$MIGRESTLOG"
+ else
+  echo "NFSSHARE:  $NFSSHARE" | tee -a "$MIGRESTLOG"
+  echo "NFSMNTDIR: $NFSMNTDIR" | tee -a "$MIGRESTLOG"
+  echo "NFSTYPE:   $NFSTYPE" | tee -a "$MIGRESTLOG"
+  error "NFS error!" | tee -a "$MIGRESTLOG"
+ fi
+fi
+
+
+# if source is on nfs copy files to a local filesystem
+if [ -n "$NFSTYPE" ]; then
+
+ # compute needed space on local filesystem
+ ssum="$(du -sk "$SOURCEDIR" | awk '{ print $1 }')"
+ # add 200 mb to size to be sure it fits
+ ssum=$(( $ssum + 200000 ))
+ # if a tmp dir was given on cmdline use this or iterate over NFSTEMPDIRS defined in defaults.conf
+ [ -n "$NFSTMPDIR" ] && NFSTEMPDIRS="$NFSTMPDIR"
+ # check for enough free space on the local filesystem
+ for i in $NFSTEMPDIRS; do
+  freespace="$(df -P $i | tail -1 | awk '{ print $4 }')"
+  if [ $freespace -gt $ssum ]; then
+   LOCALSRCDIR="$i/migration.tmp"
+   [ "$i" = "/" ] && LOCALSRCDIR="/migration.tmp"
+   [ -n "$NFSTMPDIR" ] && LOCALSRCDIR="$NFSTMPDIR"
+   break
+  fi
+ done
+
+ if [ -z "$LOCALSRCDIR" ]; then
+  error "There is not enough free space on the local filesystem! About $(( $ssum / 1024 )) MB are needed." | tee -a "$MIGRESTLOG"
+ fi
+
+ mkdir -p "$LOCALSRCDIR" | tee -a "$MIGRESTLOG"
+ echo -n "Copying about $(( $ssum / 1024 )) MB data to $LOCALSRCDIR ... be patient ..." | tee -a "$MIGRESTLOG"
+ RC=0
+ rsync -a -v --delete "$SOURCEDIR/" "$LOCALSRCDIR/" 2>> "$MIGRESTLOG" 1>> "$MIGRESTLOG" || RC=1
+ if [ "$RC" = "0" ]; then
+  echo " OK!" | tee -a "$MIGRESTLOG"
+ else
+  rm -rf "$LOCALSRCDIR"
+  error " Failed!" | tee -a "$MIGRESTLOG"
+ fi
+
+ SOURCEDIR="$LOCALSRCDIR"
+ umount_nfs
+
+fi
+
+
+# update paths
+if [ -n "$ALTCONFDIR" ]; then
+ MIGCONFDIR="$ALTCONFDIR"
+else
+ MIGCONFDIR="$SOURCEDIR"
+fi
+cd "$SOURCEDIR"
 
 
 # concenate config files
 MIGEXUSER="$MIGCONFDIR/exclude.conf"
 MIGINUSER="$MIGCONFDIR/include.conf"
 concenate_configs || error " Failed!" | tee -a "$MIGRESTLOG"
+[ -n "$NFSTYPE" ] && echo "$SOURCEDIR" >> "$EXCONFTMP"
 
 
 # check for custom.conf and read it
@@ -99,4 +172,7 @@ cp "$MIGRESTLOG" "$SOURCEDIR"
 rm -f "$EXCONFTMP"
 rm -f "$INCONFTMP"
 rm -f "$INCONFILTERED"
+cd ~
+# remove nfs tempdir if no tempdir was set on cmdline
+[ -n "$NFSTYPE" -a -z "$NFSTMPDIR" ] && rm -rf "$SOURCEDIR"
 

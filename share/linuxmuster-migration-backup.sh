@@ -46,7 +46,6 @@ echo " * already on target      : $tsum kb"
 
 # free space on TARGETDIR
 freespace="$(df -P $TARGETDIR | tail -1 | awk '{ print $4 }')"
-# reduce by 100 mb 
 echo " * free space on target   : $freespace kb"
 
 # really needed space
