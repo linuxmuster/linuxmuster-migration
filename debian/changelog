@@ -1,8 +1,14 @@
+linuxmuster-migration (1.0.8-0) unstable; urgency=low
+
+  * user cronjobs (/var/spool/cron) are now migrated as well.
+
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Tue, 08 Nov 2011 18:42:06 +0100
+
 linuxmuster-migration (1.0.7-0) unstable; urgency=low
 
   * defaults.conf: added version 5.0.4 to BACKUPVERSIONS.
 
- -- Thomas Schmitt <schmitt@lmz-bw.de>  Mon, 07 Nov 2011 15:26:35 +0100
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Tue, 08 Nov 2011 18:42:06 +0100
 
 linuxmuster-migration (1.0.6-0) unstable; urgency=low
 
