@@ -2,7 +2,7 @@ linuxmuster-migration (1.0.8-0) unstable; urgency=low
 
   * root cronjobs (/var/spool/cron/crontabs/root) are now migrated as well.
 
- -- Thomas Schmitt <schmitt@lmz-bw.de>  Fri, 18 Nov 2011 18:19:01 +0100
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Fri, 18 Nov 2011 18:37:13 +0100
 
 linuxmuster-migration (1.0.7-0) unstable; urgency=low
 
