@@ -1,9 +1,15 @@
+linuxmuster-migration (1.0.10-0) unstable; urgency=low
+
+  * added /var/spool/sieve to /usr/share/linuxmuster/migration/include.conf.
+
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Tue, 06 Dec 2011 09:10:18 +0100
+
 linuxmuster-migration (1.0.9-0) unstable; urgency=low
 
   * added migration of printer configuration (#552).
   * defaults.conf: added support for version 5.1.0.
 
- -- Thomas Schmitt <schmitt@lmz-bw.de>  Mon, 28 Nov 2011 19:49:39 +0100
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Mon, 28 Nov 2011 19:59:55 +0100
 
 linuxmuster-migration (1.0.8-0) unstable; urgency=low
 
