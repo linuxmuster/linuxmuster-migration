@@ -1165,6 +1165,9 @@ dpkg-reconfigure linuxmuster-base
 # finally be sure workstations are up to date
 import_workstations
 
+# recreate aliases db
+newaliases
+
 
 ################################################################################
 # end

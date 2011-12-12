@@ -1,3 +1,10 @@
+linuxmuster-migration (1.0.11-0) unstable; urgency=low
+
+  * include.conf: added /etc/aliases and /etc/mysql/my.cnf.
+  * linuxmuster-migration-restore.sh: added recreation of aliases.
+
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Mon, 12 Dec 2011 11:50:54 +0100
+
 linuxmuster-migration (1.0.10-0) unstable; urgency=low
 
   * added /var/spool/sieve to /usr/share/linuxmuster/migration/include.conf.
