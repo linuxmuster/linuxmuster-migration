@@ -2,6 +2,7 @@ linuxmuster-migration (1.0.11-0) unstable; urgency=low
 
   * include.conf: added /etc/aliases and /etc/mysql/my.cnf.
   * linuxmuster-migration-restore.sh: added recreation of aliases.
+  * fixed getting quota info of non quoted system.
 
  -- Thomas Schmitt <schmitt@lmz-bw.de>  Mon, 12 Dec 2011 11:50:54 +0100
 

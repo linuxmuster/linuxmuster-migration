@@ -108,11 +108,8 @@ fi
 
 # save number of quoted partitions
 echo -n " * quota info ..."
-if mount | grep -c "usrquota,grpquota" > "$QUOTAPARTS"; then
- echo " OK!"
-else
- error " Failed!"
-fi
+mount | grep -c "usrquota,grpquota" > "$QUOTAPARTS"
+echo " $(cat "$QUOTAPARTS") partition(s) are quoted."
 
 
 ################################################################################
