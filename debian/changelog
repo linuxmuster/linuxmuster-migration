@@ -1,3 +1,11 @@
+linuxmuster-migration (1.0.12-0) unstable; urgency=low
+
+  * fixed smbldap-tools migration (closes #575).
+  * fixed linuxmuster-schulkonsole's permissions.conf upgrade during migration
+    from paedML 4 to 5 (closes #573).
+
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Mon, 30 Jan 2011 16:54:21 +0100
+
 linuxmuster-migration (1.0.11-0) unstable; urgency=low
 
   * include.conf: added /etc/aliases and /etc/mysql/my.cnf.

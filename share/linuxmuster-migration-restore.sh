@@ -294,7 +294,6 @@ sambasid="$(echo get linuxmuster-base/sambasid | debconf-communicate | awk '{ pr
 net setlocalsid "$sambasid"
 net setdomainsid "$sambasid"
 smbpasswd -w `cat /etc/ldap.secret`
-sed -e "s|^SID=.*|SID=\"$sambasid\"|" -i /etc/smbldap-tools/smbldap.conf
 
 
 ################################################################################
@@ -574,6 +573,21 @@ upgrade40() {
  chown openldap:openldap /var/lib/ldap -R
  chmod 700 /var/lib/ldap
  chmod 600 /var/lib/ldap/*
+ # smbldap-tools
+ echo " * smbldap-tools ..."
+ CONF=/etc/smbldap-tools/smbldap.conf
+ cp $CONF $CONF.migration
+ sed -e "s/@@sambasid@@/${sambasid}/
+         s/@@workgroup@@/${workgroup}/
+         s/@@basedn@@/${basedn}/" $LDAPDYNTPLDIR/`basename $CONF` > $CONF
+ CONF=/etc/smbldap-tools/smbldap_bind.conf
+ cp $CONF $CONF.migration
+ sed -e "s/@@message1@@/${message1}/
+         s/@@message2@@/${message2}/
+         s/@@message3@@/${message3}/
+         s/@@basedn@@/${basedn}/g
+         s/@@ldappassword@@/${ldapadminpw}/g" $LDAPDYNTPLDIR/`basename $CONF` > $CONF
+ chmod 600 ${CONF}*
  # freeradius
  CONF=/etc/freeradius/clients.conf
  FREEDYNTPLDIR=$DYNTPLDIR/55_freeradius
