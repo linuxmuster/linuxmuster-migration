@@ -206,6 +206,53 @@ fi
 
 
 ################################################################################
+# install optional linuxmuster packages
+
+echo
+echo "####"
+echo "#### Installing optional linuxmuster packages"
+echo "####"
+
+# put apt into unattended mode
+export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_PRIORITY=critical
+export DEBCONF_TERSE=yes
+export DEBCONF_NOWARNINGS=yes
+echo 'DPkg::Options {"--force-configure-any";"--force-confmiss";"--force-confold";"--force-confdef";"--force-bad-verify";"--force-overwrite";};' > /etc/apt/apt.conf.d/99upgrade
+echo 'APT::Get::AllowUnauthenticated "true";' >> /etc/apt/apt.conf.d/99upgrade
+echo 'APT::Install-Recommends "0";' >> /etc/apt/apt.conf.d/99upgrade
+echo 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf.d/99upgrade
+
+# first do an upgrade
+aptitude update
+aptitude -y dist-upgrade
+
+# remove deinstalled packages
+SELTMP="/tmp/selections.$$"
+grep -v deinstall "$SELECTIONS" > "$SELTMP"
+
+# add kde and other obsolete packages to filter variable for linuxmuster.net 6
+if [ "${DISTFULLVERSION:0:1}" = "6" ]; then
+ grep -q ^kde "$SELECTIONS" && PKGFILTER="k sysv ttf x $PKGFILTER"
+fi
+
+# remove obsolete packages from selections
+for i in $PKGFILTER; do
+ sed "/^$i/d" -i "$SELTMP"
+done
+
+# rename various packages, whose names have changed
+sed -e 's|^linuxmuster-pykota|linuxmuster-pk|
+        s|nagios2|nagios3|g' -i "$SELTMP"
+
+# now install optional linuxmuster packages
+aptitude -y install `grep ^linuxmuster $SELTMP | awk '{ print $1 }'`
+
+# remove linuxmuster pkgs from selections
+sed "/^linuxmuster/d" -i "$SELTMP"
+
+
+################################################################################
 # restore setup data
 
 echo
@@ -463,6 +510,23 @@ upgrade40_horde() {
  echo
 }
 
+# function for upgrading horde databases, called if source system was 5.x.x
+upgrade5_horde() {
+ echo "Upgrading horde3 database ..."
+ KRONOUPGRADE=/usr/share/doc/kronolith2/examples/scripts/upgrades/2.2_to_2.3.sql
+ MNEMOUPGRADE1=/usr/share/doc/mnemo2/examples/scripts/upgrades/2.2_to_2.2.1.sql
+ MNEMOUPGRADE2=/usr/share/doc/mnemo2/examples/scripts/upgrades/2.2.1_to_2.2.2.sql
+ NAGUPGRADE=/usr/share/doc/nag2/examples/scripts/upgrades/2.2_to_2.3.sql
+ TURBAUPGRADE=/usr/share/doc/turba2/examples/scripts/upgrades/2.2.1_to_2.3.sql
+ for i in $KRONOUPGRADE $MNEMOUPGRADE1 $MNEMOUPGRADE2 $NAGUPGRADE $TURBAUPGRADE; do
+  t="$(echo $i | awk -F\/ '{ print $5 }')"
+  if [ -s "$i" ]; then
+   echo " * $t ..."
+   mysql horde < $i
+  fi
+ done
+}
+
 echo
 echo "####"
 echo "#### Restoring mysql databases"
@@ -497,60 +561,43 @@ for dbfile in *.mysql; do
 done
 
 # 4.0 upgrade: horde db update
-[ "${OLDVERSION:0:3}" = "4.0" ] && upgrade40_horde
+if [ "${OLDVERSION:0:3}" = "4.0" ]; then
+ upgrade40_horde
+ [ "${DISTFULLVERSION:0:1}" = "6" ] && upgrade5_horde
+fi
+
+# 5.0 upgrade: horde db update
+[ "${OLDVERSION:0:1}" = "5" -a "${DISTFULLVERSION:0:1}" = "6" ] && upgrade5_horde
 
 
 ################################################################################
-# restore package selections
+# install additional packages which were installed on source system
+# and essential pkgs from tasks
 
 echo
 echo "####"
-echo "#### Restoring package selections"
+echo "#### Installing additional and mandatory packages"
 echo "####"
 
-# put apt into unattended mode
-export DEBIAN_FRONTEND=noninteractive
-export DEBIAN_PRIORITY=critical
-export DEBCONF_TERSE=yes
-export DEBCONF_NOWARNINGS=yes
-echo 'DPkg::Options {"--force-configure-any";"--force-confmiss";"--force-confold";"--force-confdef";"--force-bad-verify";"--force-overwrite";};' > /etc/apt/apt.conf.d/99upgrade
-echo 'APT::Get::AllowUnauthenticated "true";' >> /etc/apt/apt.conf.d/99upgrade
-echo 'APT::Install-Recommends "0";' >> /etc/apt/apt.conf.d/99upgrade
-echo 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf.d/99upgrade
 
-# rename various packages, whose names have changed
-SELTMP="/tmp/selections.$$"
-sed -e 's|^linuxmuster-pykota|linuxmuster-pk|
-        s|nagios2|nagios3|g
-        s|cupsys|cups|g
-        s|^postgresql-7.4|postgresql-8.3|
-        s|^postgresql-client-7.4|postgresql-client-8.3|
-        s|^postgresql-8.1|postgresql-8.3|
-        s|^postgresql-client-8.1|postgresql-client-8.3|
-        s|^cpp-4.1|cpp-4.3|g
-        s|^gcc-4.1|gcc-4.3|g' "$SELECTIONS" > "$SELTMP"
-
-# first do an upgrade
-aptitude update
-aptitude -y dist-upgrade
-
-# filter out garbage and reinstall selections
-grep -v tex "$SELTMP" | grep -v libldap | grep -v python | grep -v avahi | grep -v recode | dpkg --set-selections
-apt-get -y -u dselect-upgrade
+# install packages from list
+aptitude -y install `awk '{ print $1 }' $SELTMP`
 rm "$SELTMP"
 
 # be sure all essential packages are installed
 linuxmuster-task --unattended --install=common
 linuxmuster-task --unattended --install=server
-imaging="$(echo get linuxmuster-base/imaging | debconf-communicate | awk '{ print $2 }')"
-linuxmuster-task --unattended --install=imaging-$imaging
-
+# imaging task is in 6.x.x obsolete
+if [ "${DISTFULLVERSION:0:1}" != "6" ]; then
+ imaging="$(echo get linuxmuster-base/imaging | debconf-communicate | awk '{ print $2 }')"
+ linuxmuster-task --unattended --install=imaging-$imaging
+fi
 
 ################################################################################
 # restore filesystem
 
-# upgrade 4.0.x configuration
-upgrade40() {
+# upgrade configuration
+upgrade_configs() {
  echo
  echo "####"
  echo "#### Upgrading $OLDVERSION configuration"
@@ -588,38 +635,42 @@ upgrade40() {
          s/@@basedn@@/${basedn}/g
          s/@@ldappassword@@/${ldapadminpw}/g" $LDAPDYNTPLDIR/`basename $CONF` > $CONF
  chmod 600 ${CONF}*
- # freeradius
- CONF=/etc/freeradius/clients.conf
- FREEDYNTPLDIR=$DYNTPLDIR/55_freeradius
- if [ -s "$CONF" -a -d "$FREEDYNTPLDIR" ]; then
-  echo " * freeradius ..."
-  # fetch radiussecret
-  found=false
-  while read line; do
-   if [ "$line" = "client $ipcopip {" ]; then
-    found=true
-    continue
-   fi
-   if [ "$found" = "true" -a "${line:0:6}" = "secret" ]; then
-    radiussecret="$(echo "$line" | awk -F\= '{ print $2 }' | awk '{ print $1 }')"
-   fi
-   [ -n "$radiussecret" ] && break
-  done <$CONF
-  # patch configuration
-  for i in $FREEDYNTPLDIR/*.target; do
-   targetcfg=`cat $i`
-   sourcetpl=`basename $targetcfg`
-   [ -e "$targetcfg" ] && cp $targetcfg $targetcfg.lenny-upgrade
-   sed -e "s|@@package@@|linuxmuster-freeradius|
-           s|@@date@@|$NOW|
-           s|@@radiussecret@@|$radiussecret|
-           s|@@ipcopip@@|$ipcopip|
-           s|@@ldappassword@@|$ldapadminpw|
-           s|@@basedn@@|$basedn|" $FREEDYNTPLDIR/$sourcetpl > $targetcfg
-   chmod 640 $targetcfg
-   chown root:freerad $targetcfg
-  done # targets
- fi
+ # freeradius, only for versions before 5
+ if [ $OLDVERSION \< 5 ]; then
+  CONF=/etc/freeradius/clients.conf
+  FREEDYNTPLDIR=$DYNTPLDIR/55_freeradius
+  if [ -s "$CONF" -a -d "$FREEDYNTPLDIR" ]; then
+   echo " * freeradius ..."
+   # fetch radiussecret
+   found=false
+   while read line; do
+    if [ "$line" = "client $ipcopip {" ]; then
+     found=true
+     continue
+    fi
+    if [ "$found" = "true" -a "${line:0:6}" = "secret" ]; then
+     radiussecret="$(echo "$line" | awk -F\= '{ print $2 }' | awk '{ print $1 }')"
+    fi
+    [ -n "$radiussecret" ] && break
+   done <$CONF
+   # patch configuration
+   for i in $FREEDYNTPLDIR/*.target; do
+    targetcfg=`cat $i`
+    sourcetpl=`basename $targetcfg`
+    [ -e "$targetcfg" ] && cp $targetcfg $targetcfg.migration
+    sed -e "s|@@package@@|linuxmuster-freeradius|
+            s|@@date@@|$NOW|
+            s|@@radiussecret@@|$radiussecret|
+            s|@@ipcopip@@|$ipcopip|
+            s|@@ldappassword@@|$ldapadminpw|
+            s|@@basedn@@|$basedn|" $FREEDYNTPLDIR/$sourcetpl > $targetcfg
+    chmod 640 $targetcfg
+    chown root:freerad $targetcfg
+   done # targets
+  fi
+ else
+  echo " * freeradius skipped"
+ fi # freeradius
  # horde 3
  echo " * horde3 ..."
  servername="$(hostname | awk -F\. '{ print $1 }')"
@@ -671,10 +722,17 @@ upgrade40() {
  echo " * backup ..."
  CONF=/etc/linuxmuster/backup.conf
  cp $CONF $CONF.migration
- sed -e 's|postgresql-8.1|postgresql-8.3|g
+ if [ "${DISTFULLVERSION:0:1}" = "6" ]; then
+  PGOLD="8.3"
+  PGNEW="9.1"
+ else
+  PGOLD="8.1"
+  PGNEW="8.3"
+ fi
+ sed -e "s|postgresql-$PGOLD|postgresql-$PGNEW|g
          s|cupsys|cups|g
-         s|nagios2|nagios3|g' -i $CONF
-} # upgrade40
+         s|nagios2|nagios3|g" -i $CONF
+} # upgrade_configs
 
 echo
 echo "####"
@@ -691,6 +749,9 @@ BACKUP="$(grep ^/ "$INCONFTMP")"
 for i in $BACKUP; do
  [ -e "${BACKUPFOLDER}${i}" ] && echo "$i" >> "$INCONFILTERED"
 done
+
+# filter out /etc/mysql on 6.x.x systems
+[ "${DISTFULLVERSION:0:1}" = "6" ] && sed "/^\/etc\/mysql/d" -i "$INCONFILTERED"
 
 # save quota.txt
 CONF=/etc/sophomorix/user/quota.txt
@@ -711,9 +772,8 @@ else
  echo "Restore finished with error!"
 fi
 
-# upgrade 4.0.x configuration
-OLDVERSION="$(awk '{ print $3 }' "$ISSUE")"
-[ "${OLDVERSION:0:3}" = "4.0" -a "$RC" = "0" ] && upgrade40
+# upgrade configuration files
+upgrade_configs
 
 # repair permissions
 chown cyrus:mail /var/spool/cyrus -R
@@ -723,12 +783,18 @@ chown root:www-data /etc/horde -R
 find /etc/horde -type f -exec chmod 440 '{}' \;
 
 # start services again
-for i in /etc/rc2.d/S*; do
- for s in $SERVICES; do
-  stringinstring "$s" "$i" && /etc/init.d/$s start;
- done
+for s in $SERVICES; do
+ if [ -e "/etc/init/$s.conf" ]; then
+  start "$s"
+ else
+  [ -e "/etc/init.d/$s" ] && /etc/init.d/$s start
+ fi
 done
-/etc/init.d/ssh restart
+if [ -e "/etc/init/ssh.conf" ]; then
+ restart ssh
+else
+ /etc/init.d/ssh restart
+fi
 
 [ "$RC" = "0" ] || error
 
@@ -742,7 +808,11 @@ echo "#### Restoring ldap tree"
 echo "####"
 
 # stop service
-/etc/init.d/slapd stop
+if [ -e "/etc/init/slapd.conf" ]; then
+ stop slapd
+else
+ /etc/init.d/slapd stop
+fi
 
 # delete old ldap tree
 rm -rf /etc/ldap/slapd.d
@@ -790,7 +860,7 @@ chown -R openldap:openldap /etc/ldap
 
 imaging="$(echo get linuxmuster-base/imaging | debconf-communicate | awk '{ print $2 }')"
 
-if [ "$imaging" = "linbo" ]; then
+if [ "$imaging" = "linbo" -o "${DISTFULLVERSION:0:1}" = "6" ]; then
 
  echo
  echo "####"
@@ -1171,7 +1241,11 @@ echo " OK!"
 dpkg-reconfigure linuxmuster-$FIREWALL
 
 # be sure samba runs
-/etc/init.d/samba restart
+if [ -e /etc/init/smbd.conf ]; then
+ restart smbd
+else
+ /etc/init.d/samba restart
+fi
 
 # reconfigure base package
 dpkg-reconfigure linuxmuster-base

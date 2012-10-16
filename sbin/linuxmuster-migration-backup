@@ -70,7 +70,7 @@ concenate_configs || error " Failed!" | tee -a "$MIGBACKLOG"
 
 
 # source backup script
-. "$MIGDATADIR/linuxmuster-migration-backup.sh" | tee -a "$MIGBACKLOG"
+. "$MIGDATADIR/linuxmuster-migration-backup.sh" 2>&1 | tee -a "$MIGBACKLOG"
 cp -f "$MIGBACKLOG" "$TARGETDIR"
 
 

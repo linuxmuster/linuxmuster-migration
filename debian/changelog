@@ -1,3 +1,13 @@
+linuxmuster-migration (1.0.13-0) unstable; urgency=low
+
+  * added sophomorix files containing former login names to system wide include.conf (closes #2).
+  * defaults.conf: added version 6.0.0 to supported restore versions.
+  * several modifications needed to be able to restore on a 6.x.x system.
+  * do not restore kde on a 6.x.x system.
+  * backup and restore scripts now store additionally stderr to logfiles.
+
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Tue, 15 Oct 2011 10:18:00 +0200
+
 linuxmuster-migration (1.0.12-0) unstable; urgency=low
 
   * fixed smbldap-tools migration (closes #575).

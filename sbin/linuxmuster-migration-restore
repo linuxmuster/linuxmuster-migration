@@ -164,7 +164,7 @@ internsubrange_old="$(echo get linuxmuster-base/internsubrange | debconf-communi
 
 
 # source restore script
-. "$MIGDATADIR/linuxmuster-migration-restore.sh" | tee -a "$MIGRESTLOG"
+. "$MIGDATADIR/linuxmuster-migration-restore.sh" 2>&1 | tee -a "$MIGRESTLOG"
 cp "$MIGRESTLOG" "$SOURCEDIR"
 
 
