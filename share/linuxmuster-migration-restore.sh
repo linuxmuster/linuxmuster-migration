@@ -1,4 +1,6 @@
-# $Id$
+# tschmitt 20121123
+# GPL v3
+#
 
 
 ################################################################################
@@ -417,7 +419,7 @@ else
 fi
 
 echo -n " * unpacking $FWARCHIVE ..."
-if exec_ipcop "/bin/tar xzf /var/linuxmuster/backup.tar.gz -C / && /sbin/reboot"; then
+if exec_ipcop "/bin/tar --exclude=etc/fstab -xzpf /var/linuxmuster/backup.tar.gz -C / && /sbin/reboot"; then
  echo " OK!"
 else
  error " Failed!"

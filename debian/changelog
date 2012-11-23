@@ -1,3 +1,9 @@
+linuxmuster-migration (1.0.14-0) unstable; urgency=low
+
+  * fixes ipcop's fstab overwriting (closes #38).
+
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Fri, 23 Nov 2011 13:06:00 +0100
+
 linuxmuster-migration (1.0.13-0) unstable; urgency=low
 
   * added sophomorix files containing former login names to system wide include.conf (closes #2).
