@@ -7,7 +7,7 @@ Standards-Version: 3.6.0
 
 Package: linuxmuster-migration
 Architecture: all
-Depends: ${misc:Depends}, rsync, linuxmuster-base, aptitude
+Depends: ${misc:Depends}, rsync, linuxmuster-base (>=6.0.24), aptitude
 Description: paedML Linux data migration scripts
  This package provides data migration scripts for paedML/openML Linux.
 

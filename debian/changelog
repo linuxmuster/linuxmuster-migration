@@ -1,8 +1,16 @@
+linuxmuster-migration (1.1.0-0) precise; urgency=low
+
+  * added IPFire support.
+  * fixed year 2012 in changelog (this file).
+  * restricts restore to 6.0 systems.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Wed, 23 Jan 2013 23:49:20 +0100
+
 linuxmuster-migration (1.0.14-0) precise; urgency=low
 
   * fixes ipcop's fstab overwriting (closes #38).
 
- -- Thomas Schmitt <tschmitt@inuxmuster.de>  Fri, 23 Nov 2011 16:29:00 +0100
+ -- Thomas Schmitt <tschmitt@inuxmuster.de>  Fri, 23 Nov 2012 16:29:00 +0100
 
 linuxmuster-migration (1.0.13-0) unstable; urgency=low
 
@@ -12,7 +20,7 @@ linuxmuster-migration (1.0.13-0) unstable; urgency=low
   * do not restore kde on a 6.x.x system.
   * backup and restore scripts now store additionally stderr to logfiles.
 
- -- Thomas Schmitt <schmitt@lmz-bw.de>  Tue, 15 Oct 2011 10:18:00 +0200
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Tue, 15 Oct 2012 10:18:00 +0200
 
 linuxmuster-migration (1.0.12-0) unstable; urgency=low
 
@@ -20,7 +28,7 @@ linuxmuster-migration (1.0.12-0) unstable; urgency=low
   * fixed linuxmuster-schulkonsole's permissions.conf upgrade during migration
     from paedML 4 to 5 (closes #573).
 
- -- Thomas Schmitt <schmitt@lmz-bw.de>  Mon, 30 Jan 2011 16:54:21 +0100
+ -- Thomas Schmitt <schmitt@lmz-bw.de>  Mon, 30 Jan 2012 16:54:21 +0100
 
 linuxmuster-migration (1.0.11-0) unstable; urgency=low
 

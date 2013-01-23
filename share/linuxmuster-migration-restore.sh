@@ -1,4 +1,6 @@
-# tschmitt 20121123
+#
+# thomas@linuxmuster.net
+# 23.01.2013
 # GPL v3
 #
 
@@ -17,6 +19,7 @@ for i in "$BACKUPFOLDER" "$BASEDATAFILE" "$LDIF" "$FWTYPE" "$FWARCHIVE" "$ISSUE"
   error " * `basename $i` does not exist!"
  fi
 done
+SRCFWTYPE="$(cat $FWTYPE)"
 
 
 ################################################################################
@@ -125,23 +128,48 @@ if [ -s "$MIGCONFDIR/custom.conf" ]; then
   echo "not set!"
  fi
 
+ echo -n " * FWCONFIG: "
+ if [ -n "$FWCONFIG" ]; then
+  case "$FWCONFIG" in
+   ipcop|ipfire|custom)
+    echo "$FWCONFIG"
+    touch "$CUSTOMFLAG"
+    ;;
+   *) "$FWCONFIG is no valid firewall!" ;;
+  esac
+ else
+  echo "not set!"
+ fi
+
+fi
+
+# get target firewall type
+if [ -n "$FWCONFIG" ]; then
+ TARGETFW="$FWCONFIG"
+else
+ TARGETFW="$FIREWALL"
 fi
 
 
 ################################################################################
 # save firewall's network settings
 
-echo
-echo "####"
-echo "#### Saving $FIREWALL's external network settings"
-echo "####"
+# only for ipcop
+if [ "$TARGETFW" = "ipcop" -a "$SRCFWTYPE" = "ipcop" ]; then
 
-echo -n " * downloading settings file ..."
-if get_ipcop /var/$FIREWALL/ethernet/settings $FWSETTINGS; then
- echo " OK!"
-else
- error " Failed!"
-fi
+ echo
+ echo "####"
+ echo "#### Saving $TARGETFW's external network settings"
+ echo "####"
+
+ echo -n " * downloading settings file ..."
+ if get_ipcop /var/$TARGETFW/ethernet/settings $FWSETTINGS; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
+
+fi # FWTYPE
 
 
 ################################################################################
@@ -155,8 +183,8 @@ echo "####"
 OLDVERSION="$(awk '{ print $3 }' "$ISSUE")"
 echo " * Target version: $DISTFULLVERSION"
 echo " * Source version: $OLDVERSION"
-if ! stringinstring "$DISTFULLVERSION" "$RESTOREVERSIONS"; then
- error "Target version $DISTFULLVERSION is not supported. Please upgrade your distribution."
+if ! stringinstring "$DISTMAJORVERSION" "$RESTOREVERSIONS"; then
+ error "Target version $DISTMAJORVERSION is not supported. Please upgrade your distribution."
 fi
 if ! stringinstring "$OLDVERSION" "$BACKUPVERSIONS"; then
  error "I'm sorry! Source version $OLDVERSION is not supported."
@@ -164,7 +192,7 @@ fi
 
 
 ################################################################################
-# ipcop and other passwords
+# firewall and other passwords
 
 echo
 echo "####"
@@ -173,13 +201,13 @@ echo "####"
 
 if [ -n "$ipcoppw" ]; then
  echo "Firewall password was already set on commandline."
-else
+elif [ "$TARGETFW" = "ipcop" -o "$TARGETFW" = "ipfire" ]; then
  while true; do
   stty -echo
-  read -p "Please enter $FIREWALL's root password: " ipcoppw; echo
+  read -p "Please enter $TARGETFW's root password: " ipcoppw; echo
   stty echo
   stty -echo
-  read -p "Please re-enter $FIREWALL's root password: " ipcoppwre; echo
+  read -p "Please re-enter $TARGETFW's root password: " ipcoppwre; echo
   stty echo
   [ "$ipcoppw" = "$ipcoppwre" ] && break
   echo "Passwords do not match!"
@@ -187,13 +215,16 @@ else
  done
 fi
 
-echo -n " * saving firewall password ..."
-# saves firewall password in debconf database
-if RET=`echo set linuxmuster-base/ipcoppw "$ipcoppw" | debconf-communicate`; then
- echo " OK!"
-else
- error " Failed!"
+if [ "$TARGETFW" = "ipcop" -o "$TARGETFW" = "ipfire" ]; then
+ echo -n " * saving firewall password ..."
+ # saves firewall password in debconf database
+ if RET=`echo set linuxmuster-base/ipcoppw "$ipcoppw" | debconf-communicate`; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
 fi
+
 # saves dummy password
 echo -n " * saving dummy password for admins ..."
 RC=0
@@ -247,6 +278,10 @@ done
 sed -e 's|^linuxmuster-pykota|linuxmuster-pk|
         s|nagios2|nagios3|g' -i "$SELTMP"
 
+# remove firewall packages from list
+[ "$FIREWALL" = "ipfire" -o "$FIREWALL" = "custom" ] && sed '/ipcop/d' -i "$SELTMP"
+[ "$FIREWALL" = "ipcop" -o "$FIREWALL" = "custom" ] && sed '/ipfire/d' -i "$SELTMP"
+
 # now install optional linuxmuster packages
 aptitude -y install `grep ^linuxmuster $SELTMP | awk '{ print $1 }'`
 
@@ -269,66 +304,77 @@ for i in $BASEDATA; do
  echo set linuxmuster-base/$i "$v" | debconf-communicate
 done
 
-# keep firewall's external network configuration
-
-echo -n " * reading $FIREWALL settings file ..."
-if . $FWSETTINGS; then
- echo " OK!"
-else
- error " Failed!"
+# firewall
+if [ "$TARGETFW" != "$fwconfig" ]; then
+ echo -n " * fwconfig = $TARGETFW ... "
+ echo set linuxmuster-base/fwconfig "$TARGETFW" | debconf-communicate
+ sed -e "s|^fwconfig.*|fwconfig=\"$TARGETFW\"|" -i $NETWORKSETTINGS
+ fwconfig="$TARGETFW"
 fi
 
-RC=0
-# externtype
-if [ -n "$RED_TYPE" ]; then
- RED_TYPE="$(echo "$RED_TYPE" | tr A-Z a-z)"
- echo -n " * externtype = $RED_TYPE ..."
-else
- error -n " * externtype = <not set> ..."
-fi
-echo set linuxmuster-base/externtype "$RED_TYPE" | debconf-communicate || RC=1
+# only for ipcop
+if [ "$FIREWALL" = "ipcop" -a "$TARGETFW" = "ipcop" -a "$SRCFWTYPE" = "ipcop" ]; then
 
-# externip
-if [ -n "$RED_ADDRESS" ]; then
- echo -n " * externip = $RED_ADDRESS ..."
-else
- echo -n " * externip = <not set> ..."
-fi
-echo set linuxmuster-base/externip "$RED_ADDRESS" | debconf-communicate || RC=1
+ # keep firewall's external network configuration
+ echo -n " * reading $TARGETFW settings file ..."
+ if . $FWSETTINGS; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
 
-# externmask
-if [ -n "$RED_NETMASK" ]; then
- echo -n " * externmask = $RED_NETMASK ..."
-else
- echo -n " * externmask = <not set> ..."
-fi
-echo set linuxmuster-base/externmask "$RED_NETMASK" | debconf-communicate || RC=1
+ RC=0
+ # externtype
+ if [ -n "$RED_TYPE" ]; then
+  RED_TYPE="$(echo "$RED_TYPE" | tr A-Z a-z)"
+  echo -n " * externtype = $RED_TYPE ..."
+ else
+  error -n " * externtype = <not set> ..."
+ fi
+ echo set linuxmuster-base/externtype "$RED_TYPE" | debconf-communicate || RC=1
 
-# gatewayip
-if [ -n "$DEFAULT_GATEWAY" ]; then
- echo -n " * gatewayip = $DEFAULT_GATEWAY ..."
-else
- echo -n " * gatewayip = <not set> ..."
-fi
-echo set linuxmuster-base/gatewayip "$DEFAULT_GATEWAY" | debconf-communicate || RC=1
+ # externip
+ if [ -n "$RED_ADDRESS" ]; then
+  echo -n " * externip = $RED_ADDRESS ..."
+ else
+  echo -n " * externip = <not set> ..."
+ fi
+ echo set linuxmuster-base/externip "$RED_ADDRESS" | debconf-communicate || RC=1
 
-# dnsforwarders
-if [ -n "$DNS1" -a -n "$DNS2" ]; then
- dnsforwarders="$DNS1 $DNS2"
-elif [ -n "$DNS1" -a -z "$DNS2" ]; then
- dnsforwarders="$DNS1"
-elif [ -z "$DNS1" -a -n "$DNS2" ]; then
- dnsforwarders="$DNS2"
-fi
-if [ -n "$dnsforwarders" ]; then
- echo -n " * dnsforwarders = $dnsforwarders ..."
-else
- echo -n " * dnsforwarders = <not set> ..."
-fi
-echo set linuxmuster-base/dnsforwarders "$dnsforwarders" | debconf-communicate || RC=1
+ # externmask
+ if [ -n "$RED_NETMASK" ]; then
+  echo -n " * externmask = $RED_NETMASK ..."
+ else
+  echo -n " * externmask = <not set> ..."
+ fi
+ echo set linuxmuster-base/externmask "$RED_NETMASK" | debconf-communicate || RC=1
 
-[ "$RC" = "0" ] || error "Restoring of setup data failed!"
+ # gatewayip
+ if [ -n "$DEFAULT_GATEWAY" ]; then
+  echo -n " * gatewayip = $DEFAULT_GATEWAY ..."
+ else
+  echo -n " * gatewayip = <not set> ..."
+ fi
+ echo set linuxmuster-base/gatewayip "$DEFAULT_GATEWAY" | debconf-communicate || RC=1
 
+ # dnsforwarders
+ if [ -n "$DNS1" -a -n "$DNS2" ]; then
+  dnsforwarders="$DNS1 $DNS2"
+ elif [ -n "$DNS1" -a -z "$DNS2" ]; then
+  dnsforwarders="$DNS1"
+ elif [ -z "$DNS1" -a -n "$DNS2" ]; then
+  dnsforwarders="$DNS2"
+ fi
+ if [ -n "$dnsforwarders" ]; then
+  echo -n " * dnsforwarders = $dnsforwarders ..."
+ else
+  echo -n " * dnsforwarders = <not set> ..."
+ fi
+ echo set linuxmuster-base/dnsforwarders "$dnsforwarders" | debconf-communicate || RC=1
+
+ [ "$RC" = "0" ] || error "Restoring of setup data failed!"
+
+fi # FWTYPE
 
 ################################################################################
 # restore samba sid
@@ -348,45 +394,50 @@ smbpasswd -w `cat /etc/ldap.secret`
 ################################################################################
 # prepare firewall ssh connection
 
-echo
-echo "####"
-echo "#### Preparing $FIREWALL for ssh connection"
-echo "####"
+# only for ipfire|ipcop
+if [ "$FIREWALL" != "custom" ]; then
 
-# change ips on firewall if internal network has changed
-internsubrange="$(echo get linuxmuster-base/internsubrange | debconf-communicate | awk '{ print $2 }')"
-if [ "$internsubrange_old" != "$internsubrange" ]; then
+ echo
+ echo "####"
+ echo "#### Preparing $FIREWALL for ssh connection"
+ echo "####"
 
- internsub=`echo $internsubrange | cut -f1 -d"-"`
- internsub_old=`echo $internsubrange_old | cut -f1 -d"-"`
+ # change ips on firewall if internal network has changed
+ internsubrange="$(echo get linuxmuster-base/internsubrange | debconf-communicate | awk '{ print $2 }')"
+ if [ "$internsubrange_old" != "$internsubrange" ]; then
 
- echo -n " * changing network address from 10.$internsub_old to 10.$internsub ..."
- if exec_ipcop /var/linuxmuster/patch-ips.sh $internsub_old $internsub; then
-  echo " OK!"
+  internsub=`echo $internsubrange | cut -f1 -d"-"`
+  internsub_old=`echo $internsubrange_old | cut -f1 -d"-"`
+
+  echo -n " * changing network address from 10.$internsub_old to 10.$internsub ..."
+  if exec_ipcop /var/linuxmuster/patch-ips.sh $internsub_old $internsub; then
+   echo " OK!"
+  else
+   error " Failed!"
+  fi
+
+  echo -n " * moving away authorized_keys file and trying to reboot ..."
+  if exec_ipcop "/bin/rm -f /root/.ssh/authorized_keys && /sbin/reboot"; then
+   echo " OK!"
+  else
+   error " Failed!"
+  fi
+
+  echo " * rebooting, please wait 60s."
+  sleep 60
+
  else
-  error " Failed!"
+
+  echo -n  " * moving away authorized_keys file ..."
+  if exec_ipcop /bin/rm -f /root/.ssh/authorized_keys; then
+   echo " OK!"
+  else
+   error " Failed!"
+  fi
+
  fi
 
- echo -n " * moving away authorized_keys file and trying to reboot ..."
- if exec_ipcop "/bin/rm -f /root/.ssh/authorized_keys && /sbin/reboot"; then
-  echo " OK!"
- else
-  error " Failed!"
- fi
-
- echo " * rebooting, please wait 60s."
- sleep 60
-
-else
-
- echo -n  " * moving away authorized_keys file ..."
- if exec_ipcop /bin/rm -f /root/.ssh/authorized_keys; then
-  echo " OK!"
- else
-  error " Failed!"
- fi
-
-fi
+fi # custom
 
 
 ################################################################################
@@ -406,29 +457,34 @@ $SCRIPTSDIR/linuxmuster-patch --first
 ################################################################################
 # restore previously backed up settings for ipcop
 
-echo
-echo "####"
-echo "#### Restoring $FIREWALL"
-echo "####"
+# only for ipcop
+if [ "$TARGETFW" = "ipcop" -a "$SRCFWTYPE" = "ipcop" ]; then
 
-echo -n " * uploading $FWARCHIVE ..."
-if put_ipcop "$FWARCHIVE" /var/linuxmuster/backup.tar.gz; then
- echo " OK!"
-else
- error " Failed!"
-fi
+ echo
+ echo "####"
+ echo "#### Restoring $TARGETFW"
+ echo "####"
 
-echo -n " * unpacking $FWARCHIVE ..."
-if exec_ipcop "/bin/tar --exclude=etc/fstab -xzpf /var/linuxmuster/backup.tar.gz -C / && /sbin/reboot"; then
- echo " OK!"
-else
- error " Failed!"
-fi
+ echo -n " * uploading $FWARCHIVE ..."
+ if put_ipcop "$FWARCHIVE" /var/linuxmuster/backup.tar.gz; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
 
-echo " * rebooting, please wait 60s."
-sleep 60
+ echo -n " * unpacking $FWARCHIVE ..."
+ if exec_ipcop "/bin/tar --exclude=etc/fstab -xzpf /var/linuxmuster/backup.tar.gz -C / && /sbin/reboot"; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
 
+ echo " * rebooting, please wait 60s."
+ sleep 60
 
+ fi # FWTYPE
+
+ 
 ################################################################################
 # restore postgresql databases
 
@@ -594,6 +650,27 @@ if [ "${DISTFULLVERSION:0:1}" != "6" ]; then
  imaging="$(echo get linuxmuster-base/imaging | debconf-communicate | awk '{ print $2 }')"
  linuxmuster-task --unattended --install=imaging-$imaging
 fi
+
+
+################################################################################
+# only for ipfire: repeat ssh connection stuff
+
+if [ "$TARGETFW" = "ipfire" ]; then
+
+ echo
+ echo "####"
+ echo "#### Preparing once more $TARGETFW for ssh connection"
+ echo "####"
+
+ echo -n  " * moving away authorized_keys file ..."
+ if exec_ipcop /bin/rm -f /root/.ssh/authorized_keys; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
+ 
+fi
+
 
 ################################################################################
 # restore filesystem
@@ -802,6 +879,31 @@ fi
 
 
 ################################################################################
+# only for ipfire: repeat ssh connection stuff part 2
+# meanwhile root's ssh key has changed
+
+if [ "$TARGETFW" = "ipfire" ]; then
+
+ echo
+ echo "####"
+ echo "#### Restoring $TARGETFW ssh connection"
+ echo "####"
+
+ echo -n  " * uploading root's ssh key ... "
+ mykey="$(cat /root/.ssh/id_dsa.pub)"
+ [ -z "$mykey" ] && error
+ if [ -s /root/.ssh/known_hosts ]; then
+  for i in ipfire ipcop "$ipcopip"; do
+   ssh-keygen -f "/root/.ssh/known_hosts" -R ["$i"]:222 &> /dev/null
+  done
+ fi
+ # upload root's public key
+ echo "$ipcoppw" | "$SCRIPTSDIR/sshaskpass.sh" ssh -oStrictHostKeyChecking=no -p222 "$ipcopip" "mkdir -p /root/.ssh && echo "$mykey" > /root/.ssh/authorized_keys"
+ 
+fi
+
+
+################################################################################
 # restore ldap
 
 echo
@@ -987,8 +1089,7 @@ if [ -e "$CUSTOMFLAG" ]; then
  echo -n "Reading current configuration ..."
  for i in country state location workgroup servername domainname schoolname dsluser dslpasswd smtprelay \
           internsubrange fwconfig externtype externip externmask gatewayip dnsforwarders imaging; do
-  RET=`echo get linuxmuster-base/$i | debconf-communicate`
-  RET=${RET#[0-9] }
+  RET="$(echo get linuxmuster-base/$i | debconf-communicate 2> /dev/null | awk '{ print $2 }')"
   oldvalue="${i}_old"
   echo "$oldvalue=\"$RET\"" >> $OLDVALUES
   unset RET
@@ -1051,6 +1152,12 @@ if [ -e "$CUSTOMFLAG" ]; then
  if [ -n "$INTERNSUBRANGE" -a "$INTERNSUBRANGE" != "$internsubrange_old" ]; then
   echo " * INTERNSUBRANGE: $internsubrange_old --> $INTERNSUBRANGE"
   echo set linuxmuster-base/internsubrange "$INTERNSUBRANGE" | debconf-communicate &> /dev/null
+  changed=yes
+ fi
+
+ if [ -n "$FWCONFIG" -a "$FWCONFIG" != "$fwconfig_old" ]; then
+  echo " * FWCONFIG: $fwconfig_old --> $FWCONFIG"
+  echo set linuxmuster-base/fwconfig "$FWCONFIG" | debconf-communicate &> /dev/null
   changed=yes
  fi
 
@@ -1240,7 +1347,9 @@ rm -f /etc/apt/apt.conf.d/99upgrade
 echo " OK!"
 
 # reconfigure firewall package
-dpkg-reconfigure linuxmuster-$FIREWALL
+case "$TARGETFW" in
+ ipfire|ipcop) dpkg-reconfigure linuxmuster-$TARGETFW ;;
+esac
 
 # be sure samba runs
 if [ -e /etc/init/smbd.conf ]; then
@@ -1249,8 +1358,10 @@ else
  /etc/init.d/samba restart
 fi
 
-# reconfigure base package
-dpkg-reconfigure linuxmuster-base
+# reconfigure essential packages
+for i in base linbo schulkonsole; do
+ dpkg-reconfigure linuxmuster-$i
+done
 
 # finally be sure workstations are up to date
 import_workstations
