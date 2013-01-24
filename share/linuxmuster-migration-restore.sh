@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 23.01.2013
+# 24.01.2013
 # GPL v3
 #
 
@@ -19,7 +19,9 @@ for i in "$BACKUPFOLDER" "$BASEDATAFILE" "$LDIF" "$FWTYPE" "$FWARCHIVE" "$ISSUE"
   error " * `basename $i` does not exist!"
  fi
 done
-SRCFWTYPE="$(cat $FWTYPE)"
+
+# get firewall from source system
+SOURCEFW="$(cat $FWTYPE)"
 
 
 ################################################################################
@@ -147,7 +149,7 @@ fi
 if [ -n "$FWCONFIG" ]; then
  TARGETFW="$FWCONFIG"
 else
- TARGETFW="$FIREWALL"
+ TARGETFW="$CURRENTFW"
 fi
 
 
@@ -155,7 +157,7 @@ fi
 # save firewall's network settings
 
 # only for ipcop
-if [ "$TARGETFW" = "ipcop" -a "$SRCFWTYPE" = "ipcop" ]; then
+if [ "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
 
  echo
  echo "####"
@@ -279,8 +281,8 @@ sed -e 's|^linuxmuster-pykota|linuxmuster-pk|
         s|nagios2|nagios3|g' -i "$SELTMP"
 
 # remove firewall packages from list
-[ "$FIREWALL" = "ipfire" -o "$FIREWALL" = "custom" ] && sed '/ipcop/d' -i "$SELTMP"
-[ "$FIREWALL" = "ipcop" -o "$FIREWALL" = "custom" ] && sed '/ipfire/d' -i "$SELTMP"
+[ "$CURRENTFW" = "ipfire" -o "$CURRENTFW" = "custom" ] && sed '/ipcop/d' -i "$SELTMP"
+[ "$CURRENTFW" = "ipcop" -o "$CURRENTFW" = "custom" ] && sed '/ipfire/d' -i "$SELTMP"
 
 # now install optional linuxmuster packages
 aptitude -y install `grep ^linuxmuster $SELTMP | awk '{ print $1 }'`
@@ -313,7 +315,7 @@ if [ "$TARGETFW" != "$fwconfig" ]; then
 fi
 
 # only for ipcop
-if [ "$FIREWALL" = "ipcop" -a "$TARGETFW" = "ipcop" -a "$SRCFWTYPE" = "ipcop" ]; then
+if [ "$CURRENTFW" = "ipcop" -a "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
 
  # keep firewall's external network configuration
  echo -n " * reading $TARGETFW settings file ..."
@@ -395,11 +397,11 @@ smbpasswd -w `cat /etc/ldap.secret`
 # prepare firewall ssh connection
 
 # only for ipfire|ipcop
-if [ "$FIREWALL" != "custom" ]; then
+if [ "$CURRENTFW" != "custom" ]; then
 
  echo
  echo "####"
- echo "#### Preparing $FIREWALL for ssh connection"
+ echo "#### Preparing $CURRENTFW for ssh connection"
  echo "####"
 
  # change ips on firewall if internal network has changed
@@ -458,7 +460,7 @@ $SCRIPTSDIR/linuxmuster-patch --first
 # restore previously backed up settings for ipcop
 
 # only for ipcop
-if [ "$TARGETFW" = "ipcop" -a "$SRCFWTYPE" = "ipcop" ]; then
+if [ "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
 
  echo
  echo "####"
@@ -1346,11 +1348,6 @@ echo -n "removing apt's unattended config ..."
 rm -f /etc/apt/apt.conf.d/99upgrade
 echo " OK!"
 
-# reconfigure firewall package
-case "$TARGETFW" in
- ipfire|ipcop) dpkg-reconfigure linuxmuster-$TARGETFW ;;
-esac
-
 # be sure samba runs
 if [ -e /etc/init/smbd.conf ]; then
  restart smbd
@@ -1358,8 +1355,10 @@ else
  /etc/init.d/samba restart
 fi
 
-# reconfigure essential packages
-for i in base linbo schulkonsole; do
+# reconfigure linuxmuster-pkgs finally
+pkgs="base linbo schulkonsole"
+[ "$TARGETFW" != "custom" ] && pkgs="$pkgs $TARGETFW"
+for i in $pkgs; do
  dpkg-reconfigure linuxmuster-$i
 done
 

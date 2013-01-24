@@ -4,7 +4,7 @@ linuxmuster-migration (1.1.0-0) precise; urgency=low
   * fixed year 2012 in changelog (this file).
   * restricts restore to 6.0 systems.
 
- -- Thomas Schmitt <thomas@linuxmuster.net>  Wed, 23 Jan 2013 23:49:20 +0100
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Thu, 24 Jan 2013 09:48:16 +0100
 
 linuxmuster-migration (1.0.14-0) precise; urgency=low
 
