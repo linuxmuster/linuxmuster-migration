@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 24.01.2013
+# 12.02.2013
 # GPL v3
 #
 
@@ -300,10 +300,15 @@ echo "#### Restoring setup data"
 echo "####"
 
 # restore setup values
+debconf-show linuxmuster-base > "$SOURCEDIR/debconf.cur"
 for i in $BASEDATA; do
- v="$(grep "linuxmuster-base/$i" "$BASEDATAFILE" | sed -e 's|\*||' | awk '{ print $2 }')"
- echo -n " * $i = $v ... "
- echo set linuxmuster-base/$i "$v" | debconf-communicate
+ if  grep -q "linuxmuster-base/$i" "$SOURCEDIR/debconf.cur"; then
+  v="$(grep "linuxmuster-base/$i" "$BASEDATAFILE" | sed -e 's|\*||' | awk '{ print $2 }')"
+  echo -n " * $i = $v ... "
+  echo set linuxmuster-base/$i "$v" | debconf-communicate
+ else
+  echo -n " * $i = not on target system ... "
+ fi
 done
 
 # firewall
@@ -315,68 +320,68 @@ if [ "$TARGETFW" != "$fwconfig" ]; then
 fi
 
 # only for ipcop
-if [ "$CURRENTFW" = "ipcop" -a "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
+#if [ "$CURRENTFW" = "ipcop" -a "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
 
  # keep firewall's external network configuration
- echo -n " * reading $TARGETFW settings file ..."
- if . $FWSETTINGS; then
-  echo " OK!"
- else
-  error " Failed!"
- fi
+# echo -n " * reading $TARGETFW settings file ..."
+# if . $FWSETTINGS; then
+#  echo " OK!"
+# else
+#  error " Failed!"
+# fi
 
- RC=0
+# RC=0
  # externtype
- if [ -n "$RED_TYPE" ]; then
-  RED_TYPE="$(echo "$RED_TYPE" | tr A-Z a-z)"
-  echo -n " * externtype = $RED_TYPE ..."
- else
-  error -n " * externtype = <not set> ..."
- fi
- echo set linuxmuster-base/externtype "$RED_TYPE" | debconf-communicate || RC=1
+# if [ -n "$RED_TYPE" ]; then
+#  RED_TYPE="$(echo "$RED_TYPE" | tr A-Z a-z)"
+#  echo -n " * externtype = $RED_TYPE ..."
+# else
+# error -n " * externtype = <not set> ..."
+# fi
+ #echo set linuxmuster-base/externtype "$RED_TYPE" | debconf-communicate || RC=1
 
  # externip
- if [ -n "$RED_ADDRESS" ]; then
-  echo -n " * externip = $RED_ADDRESS ..."
- else
-  echo -n " * externip = <not set> ..."
- fi
- echo set linuxmuster-base/externip "$RED_ADDRESS" | debconf-communicate || RC=1
+# if [ -n "$RED_ADDRESS" ]; then
+#  echo -n " * externip = $RED_ADDRESS ..."
+# else
+#  echo -n " * externip = <not set> ..."
+# fi
+ #echo set linuxmuster-base/externip "$RED_ADDRESS" | debconf-communicate || RC=1
 
  # externmask
- if [ -n "$RED_NETMASK" ]; then
-  echo -n " * externmask = $RED_NETMASK ..."
- else
-  echo -n " * externmask = <not set> ..."
- fi
- echo set linuxmuster-base/externmask "$RED_NETMASK" | debconf-communicate || RC=1
+# if [ -n "$RED_NETMASK" ]; then
+#  echo -n " * externmask = $RED_NETMASK ..."
+# else
+#  echo -n " * externmask = <not set> ..."
+# fi
+ #echo set linuxmuster-base/externmask "$RED_NETMASK" | debconf-communicate || RC=1
 
  # gatewayip
- if [ -n "$DEFAULT_GATEWAY" ]; then
-  echo -n " * gatewayip = $DEFAULT_GATEWAY ..."
- else
-  echo -n " * gatewayip = <not set> ..."
- fi
- echo set linuxmuster-base/gatewayip "$DEFAULT_GATEWAY" | debconf-communicate || RC=1
+# if [ -n "$DEFAULT_GATEWAY" ]; then
+#  echo -n " * gatewayip = $DEFAULT_GATEWAY ..."
+# else
+#  echo -n " * gatewayip = <not set> ..."
+# fi
+ #echo set linuxmuster-base/gatewayip "$DEFAULT_GATEWAY" | debconf-communicate || RC=1
 
  # dnsforwarders
- if [ -n "$DNS1" -a -n "$DNS2" ]; then
-  dnsforwarders="$DNS1 $DNS2"
- elif [ -n "$DNS1" -a -z "$DNS2" ]; then
-  dnsforwarders="$DNS1"
- elif [ -z "$DNS1" -a -n "$DNS2" ]; then
-  dnsforwarders="$DNS2"
- fi
- if [ -n "$dnsforwarders" ]; then
-  echo -n " * dnsforwarders = $dnsforwarders ..."
- else
-  echo -n " * dnsforwarders = <not set> ..."
- fi
- echo set linuxmuster-base/dnsforwarders "$dnsforwarders" | debconf-communicate || RC=1
+ #if [ -n "$DNS1" -a -n "$DNS2" ]; then
+ # dnsforwarders="$DNS1 $DNS2"
+ #elif [ -n "$DNS1" -a -z "$DNS2" ]; then
+ # dnsforwarders="$DNS1"
+ #elif [ -z "$DNS1" -a -n "$DNS2" ]; then
+ # dnsforwarders="$DNS2"
+ #fi
+ #if [ -n "$dnsforwarders" ]; then
+ # echo -n " * dnsforwarders = $dnsforwarders ..."
+ #else
+ # echo -n " * dnsforwarders = <not set> ..."
+ #fi
+ #echo set linuxmuster-base/dnsforwarders "$dnsforwarders" | debconf-communicate || RC=1
 
- [ "$RC" = "0" ] || error "Restoring of setup data failed!"
+ #[ "$RC" = "0" ] || error "Restoring of setup data failed!"
 
-fi # FWTYPE
+#fi # FWTYPE
 
 ################################################################################
 # restore samba sid

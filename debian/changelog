@@ -1,3 +1,9 @@
+linuxmuster-migration (1.1.1-0) precise; urgency=low
+
+  * removed external network configuration (closes #78).
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Tue, 12 Feb 2013 09:58:57 +0100
+
 linuxmuster-migration (1.1.0-0) precise; urgency=low
 
   * added IPFire support.
