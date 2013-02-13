@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 12.02.2013
+# 13.02.2013
 # GPL v3
 #
 
@@ -864,6 +864,7 @@ upgrade_configs
 # repair permissions
 chown cyrus:mail /var/spool/cyrus -R
 chown cyrus:mail /var/lib/cyrus -R
+chown cyrus:mail /var/spool/sieve/ -R
 chgrp ssl-cert /etc/ssl/private -R
 chown root:www-data /etc/horde -R
 find /etc/horde -type f -exec chmod 440 '{}' \;
