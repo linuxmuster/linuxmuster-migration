@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 13.02.2013
+# 19.02.2013
 # GPL v3
 #
 
@@ -192,6 +192,16 @@ if ! stringinstring "$OLDVERSION" "$BACKUPVERSIONS"; then
  error "I'm sorry! Source version $OLDVERSION is not supported."
 fi
 
+# get postgresql version from target system
+MAINVERSION="${DISTFULLVERSION:0:1}"
+if [ "$MAINVERSION" = "6" ]; then
+ PGOLD="8.3"
+ PGNEW="9.1"
+else
+ PGOLD="8.1"
+ PGNEW="8.3"
+fi
+
 
 ################################################################################
 # firewall and other passwords
@@ -319,69 +329,6 @@ if [ "$TARGETFW" != "$fwconfig" ]; then
  fwconfig="$TARGETFW"
 fi
 
-# only for ipcop
-#if [ "$CURRENTFW" = "ipcop" -a "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
-
- # keep firewall's external network configuration
-# echo -n " * reading $TARGETFW settings file ..."
-# if . $FWSETTINGS; then
-#  echo " OK!"
-# else
-#  error " Failed!"
-# fi
-
-# RC=0
- # externtype
-# if [ -n "$RED_TYPE" ]; then
-#  RED_TYPE="$(echo "$RED_TYPE" | tr A-Z a-z)"
-#  echo -n " * externtype = $RED_TYPE ..."
-# else
-# error -n " * externtype = <not set> ..."
-# fi
- #echo set linuxmuster-base/externtype "$RED_TYPE" | debconf-communicate || RC=1
-
- # externip
-# if [ -n "$RED_ADDRESS" ]; then
-#  echo -n " * externip = $RED_ADDRESS ..."
-# else
-#  echo -n " * externip = <not set> ..."
-# fi
- #echo set linuxmuster-base/externip "$RED_ADDRESS" | debconf-communicate || RC=1
-
- # externmask
-# if [ -n "$RED_NETMASK" ]; then
-#  echo -n " * externmask = $RED_NETMASK ..."
-# else
-#  echo -n " * externmask = <not set> ..."
-# fi
- #echo set linuxmuster-base/externmask "$RED_NETMASK" | debconf-communicate || RC=1
-
- # gatewayip
-# if [ -n "$DEFAULT_GATEWAY" ]; then
-#  echo -n " * gatewayip = $DEFAULT_GATEWAY ..."
-# else
-#  echo -n " * gatewayip = <not set> ..."
-# fi
- #echo set linuxmuster-base/gatewayip "$DEFAULT_GATEWAY" | debconf-communicate || RC=1
-
- # dnsforwarders
- #if [ -n "$DNS1" -a -n "$DNS2" ]; then
- # dnsforwarders="$DNS1 $DNS2"
- #elif [ -n "$DNS1" -a -z "$DNS2" ]; then
- # dnsforwarders="$DNS1"
- #elif [ -z "$DNS1" -a -n "$DNS2" ]; then
- # dnsforwarders="$DNS2"
- #fi
- #if [ -n "$dnsforwarders" ]; then
- # echo -n " * dnsforwarders = $dnsforwarders ..."
- #else
- # echo -n " * dnsforwarders = <not set> ..."
- #fi
- #echo set linuxmuster-base/dnsforwarders "$dnsforwarders" | debconf-communicate || RC=1
-
- #[ "$RC" = "0" ] || error "Restoring of setup data failed!"
-
-#fi # FWTYPE
 
 ################################################################################
 # restore samba sid
@@ -684,10 +631,14 @@ fi
 
 # upgrade configuration
 upgrade_configs() {
- echo
+
+echo
  echo "####"
  echo "#### Upgrading $OLDVERSION configuration"
  echo "####"
+
+ ### common stuff - begin ###
+ 
  # slapd
  echo " * slapd ..."
  CONF=/etc/ldap/slapd.conf
@@ -706,6 +657,7 @@ upgrade_configs() {
  chown openldap:openldap /var/lib/ldap -R
  chmod 700 /var/lib/ldap
  chmod 600 /var/lib/ldap/*
+ 
  # smbldap-tools
  echo " * smbldap-tools ..."
  CONF=/etc/smbldap-tools/smbldap.conf
@@ -721,8 +673,68 @@ upgrade_configs() {
          s/@@basedn@@/${basedn}/g
          s/@@ldappassword@@/${ldapadminpw}/g" $LDAPDYNTPLDIR/`basename $CONF` > $CONF
  chmod 600 ${CONF}*
- # freeradius, only for versions before 5
+ 
+ # horde 3
+ echo " * horde3 ..."
+ servername="$(hostname | awk -F\. '{ print $1 }')"
+ domainname="$(dnsdomainname)"
+ HORDDYNTPLDIR=$DYNTPLDIR/21_horde3
+ # horde (static)
+ CONF=/etc/horde/horde3/registry.php
+ cp $CONF $CONF.migration
+ cp $STATICTPLDIR/$CONF $CONF
+ CONF=/etc/horde/horde3/conf.php
+ cp $CONF $CONF.migration
+ hordepw="$(grep "^\$conf\['sql'\]\['password'\]" $CONF | awk -F\' '{ print $6 }')"
+ sed -e "s/\$conf\['auth'\]\['admins'\] =.*/\$conf\['auth'\]\['admins'\] = array\('$WWWADMIN'\);/
+         s/\$conf\['problems'\]\['email'\] =.*/\$conf\['problems'\]\['email'\] = '$WWWADMIN@$domainname';/
+         s/\$conf\['mailer'\]\['params'\]\['localhost'\] =.*/\$conf\['mailer'\]\['params'\]\['localhost'\] = '$servername.$domainname';/
+         s/\$conf\['problems'\]\['maildomain'\] =.*/\$conf\['problems'\]\['maildomain'\] = '$domainname';/
+         s/\$conf\['sql'\]\['password'\] =.*/\$conf\['sql'\]\['password'\] = '$hordepw';/" $STATICTPLDIR/$CONF > $CONF
+ # kronolith (static)
+ CONF=/etc/horde/kronolith2/conf.php
+ cp $CONF $CONF.migration
+ sed -e "s/\$conf\['storage'\]\['default_domain'\] =.*/\$conf\['storage'\]\['default_domain'\] = '$domainname';/
+         s/\$conf\['reminder'\]\['server_name'\] =.*/\$conf\['reminder'\]\['server_name'\] = '$servername.$domainname';/
+         s/\$conf\['reminder'\]\['from_addr'\] =.*/\$conf\['reminder'\]\['from_addr'\] = '$WWWADMIN@$domainname';/" $STATICTPLDIR/$CONF > $CONF
+ # imp, turba (dynamic templates)
+ for i in imp4.servers.php turba2.sources.php; do
+  TPL="$HORDDYNTPLDIR/$i"
+  if [ -e "$TPL" ]; then
+   CONF="$(cat $TPL.target)"
+   cp "$CONF" "$CONF.migration"
+   sed -e "s/'@@servername@@.@@domainname@@'/'$servername.$domainname'/g
+           s/'@@domainname@@'/'$domainname'/g
+           s/'@@schoolname@@'/'$schoolname'/g
+           s/'@@basedn@@'/'$basedn'/g
+           s/'@@cyradmpw@@'/'$cyradmpw'/" "$TPL" > "$CONF"
+  fi
+ done
+ # ingo, mnemo, nag, turba, gollem (static templates)
+ for i in ingo1/conf.php mnemo2/conf.php nag2/conf.php turba2/conf.php gollem/prefs.php; do
+  CONF="/etc/horde/$i"
+  TPL="${STATICTPLDIR}${CONF}"
+  if [ -e "$TPL" ]; then
+   cp "$CONF" "$CONF.migration"
+   cp "$TPL" "$CONF"
+  fi
+ done
+
+ # fixing backup.conf
+ echo " * backup ..."
+ CONF=/etc/linuxmuster/backup.conf
+ cp $CONF $CONF.migration
+ sed -e "s|postgresql-$PGOLD|postgresql-$PGNEW|g
+         s|cupsys|cups|g
+         s|nagios2|nagios3|g" -i $CONF
+ 
+ ### common stuff - end ###
+ 
+ ### versions before 5 stuff - begin ###
+  
  if [ $OLDVERSION \< 5 ]; then
+
+  # freeradius
   CONF=/etc/freeradius/clients.conf
   FREEDYNTPLDIR=$DYNTPLDIR/55_freeradius
   if [ -s "$CONF" -a -d "$FREEDYNTPLDIR" ]; then
@@ -754,70 +766,25 @@ upgrade_configs() {
     chown root:freerad $targetcfg
    done # targets
   fi
- else
-  echo " * freeradius skipped"
- fi # freeradius
- # horde 3
- echo " * horde3 ..."
- servername="$(hostname | awk -F\. '{ print $1 }')"
- domainname="$(dnsdomainname)"
- CONF=/etc/horde/horde3/registry.php
- HORDDYNTPLDIR=$DYNTPLDIR/21_horde3
- cp $CONF $CONF.migration
- cp $STATICTPLDIR/$CONF $CONF
- CONF=/etc/horde/horde3/conf.php
- cp $CONF $CONF.migration
- hordepw="$(grep "^\$conf\['sql'\]\['password'\]" $CONF | awk -F\' '{ print $6 }')"
- sed -e "s/\$conf\['auth'\]\['admins'\] =.*/\$conf\['auth'\]\['admins'\] = array\('$WWWADMIN'\);/
-         s/\$conf\['problems'\]\['email'\] =.*/\$conf\['problems'\]\['email'\] = '$WWWADMIN@$domainname';/
-         s/\$conf\['mailer'\]\['params'\]\['localhost'\] =.*/\$conf\['mailer'\]\['params'\]\['localhost'\] = '$servername.$domainname';/
-         s/\$conf\['problems'\]\['maildomain'\] =.*/\$conf\['problems'\]\['maildomain'\] = '$domainname';/
-         s/\$conf\['sql'\]\['password'\] =.*/\$conf\['sql'\]\['password'\] = '$hordepw';/" $STATICTPLDIR/$CONF > $CONF
- # imp
- CONF=/etc/horde/imp4/conf.php
- cp $CONF $CONF.migration
- cp $STATICTPLDIR/$CONF $CONF
- CONF=/etc/horde/imp4/servers.php
- cp $CONF $CONF.migration
- sed -e "s/'@@servername@@.@@domainname@@'/'$servername.$domainname'/g
-         s/'@@domainname@@'/'$domainname'/g
-         s/'@@cyradmpw@@'/'$cyradmpw'/" $HORDDYNTPLDIR/imp4.`basename $CONF` > $CONF
- # ingo
- CONF=/etc/horde/ingo1/conf.php
- cp $CONF $CONF.migration
- cp $STATICTPLDIR/$CONF $CONF
- # kronolith
- CONF=/etc/horde/kronolith2/conf.php
- cp $CONF $CONF.migration
- sed -e "s/\$conf\['storage'\]\['default_domain'\] =.*/\$conf\['storage'\]\['default_domain'\] = '$domainname';/
-         s/\$conf\['reminder'\]\['server_name'\] =.*/\$conf\['reminder'\]\['server_name'\] = '$servername.$domainname';/
-         s/\$conf\['reminder'\]\['from_addr'\] =.*/\$conf\['reminder'\]\['from_addr'\] = '$WWWADMIN@$domainname';/" $STATICTPLDIR/$CONF > $CONF
- # mnemo
- CONF=/etc/horde/mnemo2/conf.php
- cp $CONF $CONF.migration
- cp $STATICTPLDIR/$CONF $CONF
- # nag
- CONF=/etc/horde/nag2/conf.php
- cp $CONF $CONF.migration
- cp $STATICTPLDIR/$CONF $CONF
- # turba
- CONF=/etc/horde/turba2/conf.php
- cp $CONF $CONF.migration
- cp $STATICTPLDIR/$CONF $CONF
- # fixing backup.conf
- echo " * backup ..."
- CONF=/etc/linuxmuster/backup.conf
- cp $CONF $CONF.migration
- if [ "${DISTFULLVERSION:0:1}" = "6" ]; then
-  PGOLD="8.3"
-  PGNEW="9.1"
- else
-  PGOLD="8.1"
-  PGNEW="8.3"
+
  fi
- sed -e "s|postgresql-$PGOLD|postgresql-$PGNEW|g
-         s|cupsys|cups|g
-         s|nagios2|nagios3|g" -i $CONF
+
+ ### versions before 5 stuff - end ###
+
+ ### version 6 stuff - begin ###
+ 
+ if [ "$MAINVERSION" = "6" ]; then
+
+  # schulkonsole css img directory
+  CONF="/etc/linuxmuster/schulkonsole/apache2.conf"
+  cp "$CONF" "$CONF.migration"
+  sed -e "s|Alias /schulkonsole/img/ .*|Alias /schulkonsole/img/ /usr/share/schulkonsole/css/img/|g
+          s|Alias /favicon.ico .*|Alias /favicon.ico /usr/share/schulkonsole/css/img/favicon.ico|g" -i "$CONF"
+
+ fi
+
+ ### version 6 stuff - end ###
+ 
 } # upgrade_configs
 
 echo
@@ -837,7 +804,7 @@ for i in $BACKUP; do
 done
 
 # filter out /etc/mysql on 6.x.x systems
-[ "${DISTFULLVERSION:0:1}" = "6" ] && sed "/^\/etc\/mysql/d" -i "$INCONFILTERED"
+[ "$MAINVERSION" = "6" ] && sed "/^\/etc\/mysql/d" -i "$INCONFILTERED"
 
 # save quota.txt
 CONF=/etc/sophomorix/user/quota.txt
@@ -851,7 +818,8 @@ for i in /etc/rc0.d/K*; do
 done
 
 # sync back
-rsync -a -r -v --delete "$INPARAM" "$EXPARAM" "$BACKUPFOLDER/" / || RC=1
+#rsync -a -r -v --delete "$INPARAM" "$EXPARAM" "$BACKUPFOLDER/" / || RC=1
+rsync -a -r -v "$INPARAM" "$EXPARAM" "$BACKUPFOLDER/" / || RC=1
 if [ "$RC" = "0" ]; then
  echo "Restore successfully completed!"
 else
@@ -867,7 +835,9 @@ chown cyrus:mail /var/lib/cyrus -R
 chown cyrus:mail /var/spool/sieve/ -R
 chgrp ssl-cert /etc/ssl/private -R
 chown root:www-data /etc/horde -R
+chown www-data:www-data /var/log/horde -R
 find /etc/horde -type f -exec chmod 440 '{}' \;
+[ -d /etc/pykota ] && chown pykota:www-data /etc/pykota -R
 
 # start services again
 for s in $SERVICES; do
@@ -1339,7 +1309,7 @@ if [ $quotaparts -gt 0 ]; then
 fi
 
 # quota update
-sophomorix-quota
+sophomorix-quota --set
 
 
 ################################################################################
