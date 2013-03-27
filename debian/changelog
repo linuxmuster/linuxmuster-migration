@@ -1,3 +1,15 @@
+linuxmuster-migration (1.1.4-0) precise; urgency=low
+
+  * implemented linuxmuster.net 6 system backup incl. support for ipfire (closes #96).
+  * linuxmuster-migration-restore.sh:
+    - avoiding recreation of remoteadmin on linuxmuster.net 6 systems.
+    - purging nagios stuff first if migrating from prior versions to versions >= 6 (closes #109).
+    - added reparation of cyrus db after restore of user mailboxes (closes #108).
+    - renewing server certificate if enryption method is not 'sha1WithRSAEncryption' (closes #107).
+    - minor improvements.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Tue, 26 Mar 2013 17:20:41 +0100
+
 linuxmuster-migration (1.1.3-0) precise; urgency=low
 
   * linuxmuster-migration-restore:

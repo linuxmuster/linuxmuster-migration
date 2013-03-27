@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 19.02.2013
+# 26.03.2013
 # GPL v3
 #
 
@@ -16,7 +16,11 @@ for i in "$BACKUPFOLDER" "$BASEDATAFILE" "$LDIF" "$FWTYPE" "$FWARCHIVE" "$ISSUE"
  if [ -e "$i" ]; then
   echo " * `basename $i` ... OK!"
  else
-  error " * `basename $i` does not exist!"
+  if [ "$i" = "$FWARCHIVE" -a "$FWTYPE" = "custom" ]; then
+   echo " * `basename $i` ... skipped!"
+  else
+   error " * `basename $i` does not exist!"
+  fi
  fi
 done
 
@@ -182,18 +186,39 @@ echo "####"
 echo "#### Checking for supported versions"
 echo "####"
 
-OLDVERSION="$(awk '{ print $3 }' "$ISSUE")"
+# get source version
+if grep -q linuxmuster.net "$ISSUE"; then
+ OLDVERSION="$(awk '{ print $2 }' "$ISSUE")"
+else
+ OLDVERSION="$(awk '{ print $3 }' "$ISSUE")"
+fi
 echo " * Target version: $DISTFULLVERSION"
 echo " * Source version: $OLDVERSION"
-if ! stringinstring "$DISTMAJORVERSION" "$RESTOREVERSIONS"; then
- error "Target version $DISTMAJORVERSION is not supported. Please upgrade your distribution."
-fi
-if ! stringinstring "$OLDVERSION" "$BACKUPVERSIONS"; then
- error "I'm sorry! Source version $OLDVERSION is not supported."
-fi
+
+# test if target version is supported
+match=false
+for i in $RESTOREVERSIONS; do
+ if stringinstring "$i" "$DISTFULLVERSION"; then
+  match=true
+  break
+ fi
+done
+[ "$match" = "true" ] || error "Sorry, target version $DISTFULLVERSION is not supported."
+
+# test if source version is supported
+match=false
+for i in $BACKUPVERSIONS; do
+ if stringinstring "$i" "$OLDVERSION"; then
+  match=true
+  break
+ fi
+done
+[ "$match" = "true" ] || error "Sorry, source version $OLDVERSION is not supported."
+
+# test if target version is newer
+[ "$OLDVERSION" \< "$DISTFULLVERSION" -o "$OLDVERSION" = "$DISTFULLVERSION" ] || error "Sorry, source version is newer than target."
 
 # get postgresql version from target system
-MAINVERSION="${DISTFULLVERSION:0:1}"
 if [ "$MAINVERSION" = "6" ]; then
  PGOLD="8.3"
  PGNEW="9.1"
@@ -263,21 +288,27 @@ export DEBIAN_FRONTEND=noninteractive
 export DEBIAN_PRIORITY=critical
 export DEBCONF_TERSE=yes
 export DEBCONF_NOWARNINGS=yes
-echo 'DPkg::Options {"--force-configure-any";"--force-confmiss";"--force-confold";"--force-confdef";"--force-bad-verify";"--force-overwrite";};' > /etc/apt/apt.conf.d/99upgrade
-echo 'APT::Get::AllowUnauthenticated "true";' >> /etc/apt/apt.conf.d/99upgrade
-echo 'APT::Install-Recommends "0";' >> /etc/apt/apt.conf.d/99upgrade
-echo 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf.d/99upgrade
+
+# tweak apt to be noninteractive
+write_aptconftweak(){
+ echo 'DPkg::Options {"--force-configure-any";"--force-confmiss";"--force-confold";"--force-confdef";"--force-bad-verify";"--force-overwrite";};' > "$APTCONFTWEAK"
+ echo 'APT::Get::AllowUnauthenticated "true";' >> "$APTCONFTWEAK"
+ echo 'APT::Install-Recommends "0";' >> "$APTCONFTWEAK"
+ echo 'APT::Install-Suggests "0";' >> "$APTCONFTWEAK"
+}
+
+write_aptconftweak
 
 # first do an upgrade
-aptitude update
+aptitude update || exit 1
 aptitude -y dist-upgrade
 
-# remove deinstalled packages
+# remove deinstalled packages from list
 SELTMP="/tmp/selections.$$"
 grep -v deinstall "$SELECTIONS" > "$SELTMP"
 
 # add kde and other obsolete packages to filter variable for linuxmuster.net 6
-if [ "${DISTFULLVERSION:0:1}" = "6" ]; then
+if [ "$MAINVERSION" = "6" ]; then
  grep -q ^kde "$SELECTIONS" && PKGFILTER="k sysv ttf x $PKGFILTER"
 fi
 
@@ -293,6 +324,12 @@ sed -e 's|^linuxmuster-pykota|linuxmuster-pk|
 # remove firewall packages from list
 [ "$CURRENTFW" = "ipfire" -o "$CURRENTFW" = "custom" ] && sed '/ipcop/d' -i "$SELTMP"
 [ "$CURRENTFW" = "ipcop" -o "$CURRENTFW" = "custom" ] && sed '/ipfire/d' -i "$SELTMP"
+
+# purge nagios stuff if migrating from prior versions to versions >= 6
+if [ "$MAINVERSION" -ge "6" -a "$OLDVERSION" \< "6" ]; then
+ apt-get purge `dpkg -l | grep nagios | awk '{ print $2 }'`
+ rm -rf /etc/nagios*
+fi
 
 # now install optional linuxmuster packages
 aptitude -y install `grep ^linuxmuster $SELTMP | awk '{ print $1 }'`
@@ -310,6 +347,7 @@ echo "#### Restoring setup data"
 echo "####"
 
 # restore setup values
+touch "$SOURCEDIR/debconf.cur" || exit 1
 debconf-show linuxmuster-base > "$SOURCEDIR/debconf.cur"
 for i in $BASEDATA; do
  if  grep -q "linuxmuster-base/$i" "$SOURCEDIR/debconf.cur"; then
@@ -409,10 +447,10 @@ $SCRIPTSDIR/linuxmuster-patch --first
 
 
 ################################################################################
-# restore previously backed up settings for ipcop
+# restore firewall settings
 
-# only for ipcop
-if [ "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
+# only for ipcop/ipfire
+if [ "$TARGETFW" = "$SOURCEFW" -a "$TARGETFW" != "custom" ]; then
 
  echo
  echo "####"
@@ -433,10 +471,10 @@ if [ "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
   error " Failed!"
  fi
 
- echo " * rebooting, please wait 60s."
- sleep 60
+ echo " * rebooting, please wait 120s."
+ sleep 120
 
- fi # FWTYPE
+fi # FWTYPE
 
  
 ################################################################################
@@ -575,11 +613,11 @@ done
 # 4.0 upgrade: horde db update
 if [ "${OLDVERSION:0:3}" = "4.0" ]; then
  upgrade40_horde
- [ "${DISTFULLVERSION:0:1}" = "6" ] && upgrade5_horde
+ [ "$MAINVERSION" = "6" ] && upgrade5_horde
 fi
 
 # 5.0 upgrade: horde db update
-[ "${OLDVERSION:0:1}" = "5" -a "${DISTFULLVERSION:0:1}" = "6" ] && upgrade5_horde
+[ "${OLDVERSION:0:1}" = "5" -a "$MAINVERSION" = "6" ] && upgrade5_horde
 
 
 ################################################################################
@@ -591,36 +629,43 @@ echo "####"
 echo "#### Installing additional and mandatory packages"
 echo "####"
 
-
-# install packages from list
-aptitude -y install `awk '{ print $1 }' $SELTMP`
-rm "$SELTMP"
-
 # be sure all essential packages are installed
 linuxmuster-task --unattended --install=common
 linuxmuster-task --unattended --install=server
 # imaging task is in 6.x.x obsolete
-if [ "${DISTFULLVERSION:0:1}" != "6" ]; then
+if [ "$MAINVERSION" != "6" ]; then
  imaging="$(echo get linuxmuster-base/imaging | debconf-communicate | awk '{ print $2 }')"
  linuxmuster-task --unattended --install=imaging-$imaging
 fi
+
+# write it again because it was deleted by linuxmuster-setup
+write_aptconftweak
+
+# install additional packages from list
+aptitude -y install `awk '{ print $1 }' $SELTMP`
+rm "$SELTMP"
 
 
 ################################################################################
 # only for ipfire: repeat ssh connection stuff
 
 if [ "$TARGETFW" = "ipfire" ]; then
+ 
+ # only if ssh link works
+ if ssh -oNumberOfPasswordPrompts=0 -oStrictHostKeyChecking=no -p222 $ipcopip "echo -n"; then
 
- echo
- echo "####"
- echo "#### Preparing once more $TARGETFW for ssh connection"
- echo "####"
+  echo
+  echo "####"
+  echo "#### Preparing once more $TARGETFW for ssh connection"
+  echo "####"
 
- echo -n  " * moving away authorized_keys file ..."
- if exec_ipcop /bin/rm -f /root/.ssh/authorized_keys; then
-  echo " OK!"
- else
-  error " Failed!"
+  echo -n  " * moving away authorized_keys file ..."
+  if exec_ipcop /bin/rm -f /root/.ssh/authorized_keys; then
+   echo " OK!"
+  else
+   error " Failed!"
+  fi
+ 
  fi
  
 fi
@@ -811,14 +856,12 @@ CONF=/etc/sophomorix/user/quota.txt
 cp "$CONF" "$CONF.migration.old"
 
 # stop services
-for i in /etc/rc0.d/K*; do
- for s in $SERVICES; do
-  stringinstring "$s" "$i" && /etc/init.d/$s stop;
- done
-done
+start_stop_services stop
+        
+# purge nagios stuff if migrating from prior versions to versions >= 6
+[ "$MAINVERSION" -ge "6" -a "$OLDVERSION" \< "6" ] && rm -f /etc/nagios3/conf.d/*
 
 # sync back
-#rsync -a -r -v --delete "$INPARAM" "$EXPARAM" "$BACKUPFOLDER/" / || RC=1
 rsync -a -r -v "$INPARAM" "$EXPARAM" "$BACKUPFOLDER/" / || RC=1
 if [ "$RC" = "0" ]; then
  echo "Restore successfully completed!"
@@ -839,14 +882,12 @@ chown www-data:www-data /var/log/horde -R
 find /etc/horde -type f -exec chmod 440 '{}' \;
 [ -d /etc/pykota ] && chown pykota:www-data /etc/pykota -R
 
+# repair cyrus db (#107)
+rm -f /var/lib/cyrus/db/*
+su -c '/usr/sbin/ctl_cyrusdb -r' cyrus
+
 # start services again
-for s in $SERVICES; do
- if [ -e "/etc/init/$s.conf" ]; then
-  start "$s"
- else
-  [ -e "/etc/init.d/$s" ] && /etc/init.d/$s start
- fi
-done
+start_stop_services start
 if [ -e "/etc/init/ssh.conf" ]; then
  restart ssh
 else
@@ -942,7 +983,7 @@ chown -R openldap:openldap /etc/ldap
 
 imaging="$(echo get linuxmuster-base/imaging | debconf-communicate | awk '{ print $2 }')"
 
-if [ "$imaging" = "linbo" -o "${DISTFULLVERSION:0:1}" = "6" ]; then
+if [ "$imaging" = "linbo" -o "$MAINVERSION" = "6" ]; then
 
  echo
  echo "####"
@@ -955,9 +996,9 @@ fi
 
 
 ################################################################################
-# recreate remoteadmin
+# recreate remoteadmin (not on linuxmuster.net >= 6.0)
 
-if [ -s "$REMOTEADMIN.hash" ]; then
+if [ -s "$REMOTEADMIN.hash" -a $MAINVERSION -lt 6 ]; then
 
  echo
  echo "####"
@@ -1150,6 +1191,25 @@ fi # custom
 
 
 ################################################################################
+# renew server certificate (if incompatible, version 6 or greater) (#107)
+
+RENEWCERT="$(openssl x509 -noout -text -in $SERVERCERT | grep $REQENCRMETHOD)"
+
+if [ $MAINVERSION -ge 6 -a -z "$RENEWCERT" ]; then
+
+ echo
+ echo "####"
+ echo "#### Renewing server certificate"
+ echo "####"
+ 
+ $SCRIPTSDIR/create-ssl-cert.sh
+ 
+ echo
+ echo "IMPORTANT: Browser and E-Mail-Clients have to reimport the new certificate!"
+
+fi
+
+################################################################################
 # quota
 
 echo
@@ -1321,7 +1381,7 @@ echo "#### Final tasks"
 echo "####"
 
 echo -n "removing apt's unattended config ..."
-rm -f /etc/apt/apt.conf.d/99upgrade
+rm -f "$APTCONFTWEAK"
 echo " OK!"
 
 # be sure samba runs

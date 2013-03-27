@@ -1,4 +1,8 @@
-# $Id$
+#
+# linuxmuster-migration-backup
+# thomas@linuxmuster.net
+# 20.03.2013
+#
 
 ################################################################################
 # check if current version is supported
@@ -7,7 +11,14 @@ echo
 echo "####"
 echo "#### Checking version"
 echo "####"
-if stringinstring "$DISTFULLVERSION" "$BACKUPVERSIONS"; then
+match=false
+for i in $BACKUPVERSIONS; do
+ if stringinstring "$i" "$DISTFULLVERSION"; then
+  match=true
+  break
+ fi
+done
+if [ "$match" = "true" ]; then
  echo "Source version: $DISTFULLVERSION."
 else
  error "Version $DISTFULLVERSION is not supported."
@@ -113,23 +124,48 @@ echo " $(cat "$QUOTAPARTS") partition(s) are quoted."
 
 
 ################################################################################
-# ipcop settings, certificates etc.
+# firewall settings, certificates etc.
 
-echo
-echo "####"
-echo "#### Backing up $FIREWALL settings"
-echo "####"
+# get firewall type from system
+FIREWALL=ipcop
+[ -n "$fwconfig" ] && FIREWALL="$fwconfig"
 
-echo -n " * creating and downloading $FWARCHIVE ..."
+# backup firewall settings if not custom
+if [ "$FIREWALL" != "custom" ]; then
 
-RC=0
-exec_ipcop /bin/tar czf /var/linuxmuster/backup.tar.gz --exclude=/var/$FIREWALL/ethernet/settings /etc /root/.ssh /var/ipcop || RC=1
-get_ipcop /var/linuxmuster/backup.tar.gz "$FWARCHIVE" || RC=1
+ echo
+ echo "####"
+ echo "#### Backing up $FIREWALL settings"
+ echo "####"
 
-if [ "$RC" = "0" ]; then
- echo " OK!"
-else
- error " Failed!"
+ echo -n " * creating and downloading $FWARCHIVE ..."
+
+ RC=0
+ if [ "$FIREWALL" = "ipcop" ]; then
+
+  exec_ipcop /bin/tar czf /var/linuxmuster/backup.tar.gz --exclude=/var/$FIREWALL/ethernet/settings /etc /root/.ssh /var/$FIREWALL || RC=1
+  get_ipcop /var/linuxmuster/backup.tar.gz "$FWARCHIVE" || RC=1
+
+ else # ipfire
+
+  for cmd in makedirs exclude; do
+   exec_ipcop /usr/local/bin/backupctrl $cmd >/dev/null 2>&1 || RC=1
+  done
+  latest_ipf="$(ssh -p 222 root@${ipcopip} ls -1rt /var/ipfire/backup/*.ipf | tail -1)"
+  if [ -n "$latest_ipf" ]; then
+   get_ipcop $latest_ipf "$FWARCHIVE" || RC=1
+  else
+   RC=1
+  fi
+
+ fi
+
+ if [ "$RC" = "0" ]; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
+
 fi
 
 echo "$FIREWALL" > "$FWTYPE"
@@ -185,21 +221,13 @@ echo "####"
 RC=0
 
 # stop services
-for i in /etc/rc0.d/K*; do
- for s in $SERVICES; do
-  stringinstring "$s" "$i" && /etc/init.d/$s stop;
- done
-done
+start_stop_services stop
 
 mkdir -p "$BACKUPFOLDER"
 rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || RC=1
 
 # start services again
-for i in /etc/rc2.d/S*; do
- for s in $SERVICES; do
-  stringinstring "$s" "$i" && /etc/init.d/$s start;
- done
-done
+start_stop_services start
 
 if [ "$RC" = "0" ]; then
  echo "Backup successfully completed!"
@@ -217,7 +245,7 @@ echo "#### Backing up postgresql databases"
 echo "####"
 
 # dumping all databases except postgres and templates
-for i in `psql -t -l -U postgres | awk '{ print $1 }'`; do
+for i in `psql -t -l -U postgres | awk '{ print $1 }' | grep ^[a-zA-Z0-9]`; do
 
  case $i in
   postgres|template0|template1) continue ;;
@@ -251,7 +279,11 @@ echo "####"
 echo "#### Backing up mysql databases"
 echo "####"
 
-for i in `LANG=C mysqlshow | grep ^"| "[0-9a-zA-Z] | grep -v information_schema | grep -v ^"| mysql" | awk '{ print $2 }'`; do
+for i in `LANG=C mysqlshow | grep ^"| "[0-9a-zA-Z] | grep -v ^"| mysql" | awk '{ print $2 }'`; do
+
+ case $i in
+  information_schema|performance_schema|test) continue ;;
+ esac
 
  echo -n " * $i ..."
 
