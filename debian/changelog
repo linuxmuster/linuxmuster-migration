@@ -1,3 +1,13 @@
+linuxmuster-migration (1.1.5-0) precise; urgency=low
+
+  * linuxmuster-migration-restore.sh:
+    - fixed needless question about purging nagios (closes #115).
+    - reconfigures nagios configuration during final tasks.
+    - added deletion of deliver.db to cyrus database repair (see #108) and moved
+      the code to final tasks.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Thu, 04 Apr 2013 22:07:50 +0200
+
 linuxmuster-migration (1.1.4-0) precise; urgency=low
 
   * implemented linuxmuster.net 6 system backup incl. support for ipfire (closes #96).
@@ -8,7 +18,7 @@ linuxmuster-migration (1.1.4-0) precise; urgency=low
     - renewing server certificate if enryption method is not 'sha1WithRSAEncryption' (closes #107).
     - minor improvements.
 
- -- Thomas Schmitt <thomas@linuxmuster.net>  Tue, 26 Mar 2013 17:20:41 +0100
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Wed, 27 Mar 2013 23:18:29 +0100
 
 linuxmuster-migration (1.1.3-0) precise; urgency=low
 

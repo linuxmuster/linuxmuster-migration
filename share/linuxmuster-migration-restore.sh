@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 26.03.2013
+# 04.04.2013
 # GPL v3
 #
 
@@ -327,7 +327,7 @@ sed -e 's|^linuxmuster-pykota|linuxmuster-pk|
 
 # purge nagios stuff if migrating from prior versions to versions >= 6
 if [ "$MAINVERSION" -ge "6" -a "$OLDVERSION" \< "6" ]; then
- apt-get purge `dpkg -l | grep nagios | awk '{ print $2 }'`
+ apt-get -y purge `dpkg -l | grep nagios | awk '{ print $2 }'`
  rm -rf /etc/nagios*
 fi
 
@@ -882,10 +882,6 @@ chown www-data:www-data /var/log/horde -R
 find /etc/horde -type f -exec chmod 440 '{}' \;
 [ -d /etc/pykota ] && chown pykota:www-data /etc/pykota -R
 
-# repair cyrus db (#107)
-rm -f /var/lib/cyrus/db/*
-su -c '/usr/sbin/ctl_cyrusdb -r' cyrus
-
 # start services again
 start_stop_services start
 if [ -e "/etc/init/ssh.conf" ]; then
@@ -1391,8 +1387,15 @@ else
  /etc/init.d/samba restart
 fi
 
+# repair cyrus db (#107)
+/etc/init.d/cyrus-imapd stop
+rm -f /var/lib/cyrus/db/*
+rm -f /var/lib/cyrus/deliver.db
+su -c '/usr/sbin/ctl_cyrusdb -r' cyrus
+/etc/init.d/cyrus-imapd start
+
 # reconfigure linuxmuster-pkgs finally
-pkgs="base linbo schulkonsole"
+pkgs="base linbo schulkonsole nagios-base"
 [ "$TARGETFW" != "custom" ] && pkgs="$pkgs $TARGETFW"
 for i in $pkgs; do
  dpkg-reconfigure linuxmuster-$i
