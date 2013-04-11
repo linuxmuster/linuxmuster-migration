@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 04.04.2013
+# 11.04.2013
 # GPL v3
 #
 
@@ -450,31 +450,58 @@ $SCRIPTSDIR/linuxmuster-patch --first
 # restore firewall settings
 
 # only for ipcop/ipfire
-if [ "$TARGETFW" = "$SOURCEFW" -a "$TARGETFW" != "custom" ]; then
+if [ "$TARGETFW" != "custom" ]; then
 
- echo
- echo "####"
- echo "#### Restoring $TARGETFW"
- echo "####"
-
- echo -n " * uploading $FWARCHIVE ..."
- if put_ipcop "$FWARCHIVE" /var/linuxmuster/backup.tar.gz; then
-  echo " OK!"
+ # if source and target are different and there are openvpn certs then restore only openvpn settings and certs
+ if [ "$TARGETFW" = "$SOURCEFW" ]; then
+  ovpnmsg="complete $SOURCEFW settings"
  else
-  error " Failed!"
+  ovpncerts="$(tar -O -xzf $FWARCHIVE var/$SOURCEFW/ovpn/ovpnconfig | wc -l)"
+  if [ $ovpncerts -gt 0 ]; then
+   # extract openvpn stuff from archive and create a new one
+   ovpnmsg="$SOURCEFW openvpn settings"
+   curdir="$(pwd)"
+   tmpdir="/var/tmp/migration.$$"
+   mkdir -p "$tmpdir"
+   tar -xzpf "$FWARCHIVE" -C "$tmpdir"
+   cd "$tmpdir"
+   mkdir -p "var/$TARGETFW"
+   mv "var/$SOURCEFW/ovpn" "var/$TARGETFW"
+   sed -e "s|$SOURCEFW|$TARGETFW|g" -i "var/$TARGETFW/ovpn/server.conf"
+   FWARCHIVE="/tmp/ovpn.$$.tar.gz"
+   tar -czpf "$FWARCHIVE" "var/$TARGETFW"
+   cd "$curdir"
+   rm -rf "$tmpdir"
+  fi
  fi
 
- echo -n " * unpacking $FWARCHIVE ..."
- if exec_ipcop "/bin/tar --exclude=etc/fstab -xzpf /var/linuxmuster/backup.tar.gz -C / && /sbin/reboot"; then
-  echo " OK!"
- else
-  error " Failed!"
- fi
+ if [ -n "$ovpnmsg" ]; then
 
- echo " * rebooting, please wait 120s."
- sleep 120
+  echo
+  echo "####"
+  echo "#### Restoring $ovpnmsg"
+  echo "####"
 
-fi # FWTYPE
+  echo -n " * uploading $FWARCHIVE ..."
+  if put_ipcop "$FWARCHIVE" /var/linuxmuster/backup.tar.gz; then
+   echo " OK!"
+  else
+   error " Failed!"
+  fi
+
+  echo -n " * unpacking $FWARCHIVE ..."
+  if exec_ipcop "/bin/tar --exclude=etc/fstab -xzpf /var/linuxmuster/backup.tar.gz -C / && /sbin/reboot"; then
+   echo " OK!"
+  else
+   error " Failed!"
+  fi
+
+  echo " * rebooting, please wait 120s."
+  sleep 120
+
+ fi # ovpnmsg
+
+fi # TARGETFW
 
  
 ################################################################################
