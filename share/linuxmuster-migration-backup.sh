@@ -1,7 +1,7 @@
 #
 # linuxmuster-migration-backup
 # thomas@linuxmuster.net
-# 20.03.2013
+# 06.09.2013
 #
 
 ################################################################################
@@ -37,11 +37,11 @@ echo "####"
 ssum=0 ; tsum=0 ; s=0 ; t=0
 BACKUP="$(grep ^/ "$INCONFTMP")"
 for i in $BACKUP; do
- #  source space
+ # source space
  if [ -e "$i" ]; then
   # on this occasion write only the really existent files to INCONFILTERED for use with rsync
   echo "$i" >> "$INCONFILTERED"
-  s="$(du -sk "$i" | awk '{ print $1 }')"
+  s="$(du --exclude-from="$EXCONFTMP" -sk "$i" | awk '{ print $1 }')"
   ssum=$(( $s + $ssum ))
  fi
  # target space

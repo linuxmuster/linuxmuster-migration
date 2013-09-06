@@ -1,3 +1,11 @@
+linuxmuster-migration (1.1.7-0) precise; urgency=low
+
+  * linuxmuster-migration-restore.sh: fixed country string match (closes #183).
+  * linuxmuster-migration-backup.sh: fixed free space computing counting in excluded files (closes #166).
+  * updated header comments in some system config files.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Fri, 06 Sep 2013 12:43:09 +0200
+
 linuxmuster-migration (1.1.6-0) precise; urgency=low
 
   * linuxmuster-migration-restore.sh: fixed migrating openvpn certificates (closes #120).

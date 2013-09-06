@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 11.04.2013
+# 06.09.2013
 # GPL v3
 #
 
@@ -88,7 +88,7 @@ if [ -s "$MIGCONFDIR/custom.conf" ]; then
 
  echo -n " * COUNTRY: "
  if [ -n "$COUNTRY" ]; then
-  if ! (expr match "$COUNTRY" '\([ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ]\)'); then
+  if (expr match "$COUNTRY" '\([ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ]\)'); then
    echo "$COUNTRY"
    touch "$CUSTOMFLAG"
   else
