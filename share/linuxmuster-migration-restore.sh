@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 06.09.2013
+# 16.09.2013
 # GPL v3
 #
 
@@ -468,6 +468,7 @@ if [ "$TARGETFW" != "custom" ]; then
    mkdir -p "var/$TARGETFW"
    mv "var/$SOURCEFW/ovpn" "var/$TARGETFW"
    sed -e "s|$SOURCEFW|$TARGETFW|g" -i "var/$TARGETFW/ovpn/server.conf"
+   [ -s "var/$TARGETFW/ovpn/openssl/ovpn.cnf" ] && sed -e "s|$SOURCEFW|$TARGETFW|g" -i "var/$TARGETFW/ovpn/openssl/ovpn.cnf"
    FWARCHIVE="/tmp/ovpn.$$.tar.gz"
    tar -czpf "$FWARCHIVE" "var/$TARGETFW"
    cd "$curdir"

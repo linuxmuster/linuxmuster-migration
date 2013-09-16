@@ -1,3 +1,9 @@
+linuxmuster-migration (1.1.8-0) precise; urgency=low
+
+  * linuxmuster-migration-restore.sh: fixing path in ovpn.cnf if there are OpenVPN certs to migrate (closes #200).
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Mon, 16 Sep 2013 12:21:32 +0200
+
 linuxmuster-migration (1.1.7-0) precise; urgency=low
 
   * linuxmuster-migration-restore.sh: fixed country string match (closes #183).
