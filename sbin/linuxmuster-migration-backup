@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # thomas@linuxmuster.net
-# 23.01.2013
+# 25.01.2014
 # GPL v3
 #
 
@@ -22,16 +22,18 @@ usage(){
  echo " -c <config dir>  Path to config directory (optional)."
  echo "                  Default is /etc/linuxmuster/migration."
  echo " -d <target dir>  Path to target directory (must exist, mandatory)."
+ echo " -f               Forced start, skipping free space check."
  echo " -h               Show this help."
  exit 1
 }
 
 
 # parse commandline arguments
-while getopts ":c:d:h" opt; do
+while getopts ":c:d:fh" opt; do
  case $opt in
   c) ALTCONFDIR=$OPTARG ;;
   d) TARGETDIR=$OPTARG ;;
+  f) FORCE=yes ;;
   h) usage ;;
   \?) echo "Invalid option: -$OPTARG" >&2
       usage ;;
@@ -51,6 +53,7 @@ if [ -n "$ALTCONFDIR" ]; then
  MIGINUSER="$MIGCONFDIR/include.conf"
 fi
 cd "$TARGETDIR" || usage
+[ -z "$FORCE" ] && FORCE="no"
 
 
 # delete old config file
@@ -61,8 +64,9 @@ rm -f "$MIGBACKLOG"
 echo
 echo "####" | tee -a "$MIGBACKLOG"
 echo "#### Starting backup of migration data" | tee -a "$MIGBACKLOG"
-echo "#### Targetdir: $TARGETDIR" | tee -a "$MIGBACKLOG"
-echo "#### Configdir: $MIGCONFDIR" | tee -a "$MIGBACKLOG"
+echo "#### Targetdir : $TARGETDIR" | tee -a "$MIGBACKLOG"
+echo "#### Configdir : $MIGCONFDIR" | tee -a "$MIGBACKLOG"
+echo "#### Skip check: $FORCE" | tee -a "$MIGBACKLOG"
 echo "#### `date`" | tee -a "$MIGBACKLOG"
 echo "####" | tee -a "$MIGBACKLOG"
 

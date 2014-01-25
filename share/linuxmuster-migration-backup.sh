@@ -1,7 +1,7 @@
 #
 # linuxmuster-migration-backup
 # thomas@linuxmuster.net
-# 06.09.2013
+# 25.01.2014
 #
 
 ################################################################################
@@ -28,48 +28,65 @@ fi
 ################################################################################
 # computing needed backup space
 
-echo
-echo "####"
-echo "#### Computing backup space"
-echo "####"
-
-# add all file sizes to SUM
-ssum=0 ; tsum=0 ; s=0 ; t=0
 BACKUP="$(grep ^/ "$INCONFTMP")"
-for i in $BACKUP; do
- # source space
- if [ -e "$i" ]; then
-  # on this occasion write only the really existent files to INCONFILTERED for use with rsync
-  echo "$i" >> "$INCONFILTERED"
-  s="$(du --exclude-from="$EXCONFTMP" -sk "$i" | awk '{ print $1 }')"
-  ssum=$(( $s + $ssum ))
+touch "$INCONFILTERED"
+
+# skip check
+if [ "$FORCE" = "yes" ]; then
+
+ echo
+ echo "####"
+ echo "#### Skipping backup space check"
+ echo "####"
+
+ for i in $BACKUP; do
+  [ -e "$i" ] && echo "$i" >> "$INCONFILTERED"
+ done
+
+else # do check
+
+ echo
+ echo "####"
+ echo "#### Computing backup space"
+ echo "####"
+
+ # add all file sizes to SUM
+ ssum=0 ; tsum=0 ; s=0 ; t=0
+ for i in $BACKUP; do
+  # source space
+  if [ -e "$i" ]; then
+   # on this occasion write only the really existent files to INCONFILTERED for use with rsync
+   echo "$i" >> "$INCONFILTERED"
+   s="$(du --exclude-from="$EXCONFTMP" -sk "$i" | awk '{ print $1 }')"
+   ssum=$(( $s + $ssum ))
+  fi
+  # target space
+  if [ -e "${BACKUPFOLDER}${i}" ]; then
+   t="$(du -sk "${BACKUPFOLDER}${i}" | awk '{ print $1 }')"
+   tsum=$(( $t + $tsum ))
+  fi
+ done
+ # add 200 mb to backup size to be sure it fits
+ ssum=$(( $ssum + 200000 ))
+ echo " * total backup size      : $ssum kb"
+ echo " * already on target      : $tsum kb"
+
+ # free space on TARGETDIR
+ freespace="$(df -P $TARGETDIR | tail -1 | awk '{ print $4 }')"
+ echo " * free space on target   : $freespace kb"
+
+ # really needed space
+ needed=$(( $ssum - $tsum ))
+ echo " * needed space on target : $needed kb"
+
+ # decide whether it fits
+ if [ $freespace -lt $needed ]; then
+  error "Sorry, does not fit!"
+ else
+  echo "Great, that fits. :-)"
  fi
- # target space
- if [ -e "${BACKUPFOLDER}${i}" ]; then
-  t="$(du -sk "${BACKUPFOLDER}${i}" | awk '{ print $1 }')"
-  tsum=$(( $t + $tsum ))
- fi
-done
-# add 200 mb to backup size to be sure it fits
-ssum=$(( $ssum + 200000 ))
-echo " * total backup size      : $ssum kb"
-echo " * already on target      : $tsum kb"
 
-# free space on TARGETDIR
-freespace="$(df -P $TARGETDIR | tail -1 | awk '{ print $4 }')"
-echo " * free space on target   : $freespace kb"
-
-# really needed space
-needed=$(( $ssum - $tsum ))
-echo " * needed space on target : $needed kb"
-
-# decide whether it fits
-if [ $freespace -lt $needed ]; then
- error "Sorry, does not fit!"
-else
- echo "Great, that fits. :-)"
 fi
-
 
 ################################################################################
 # check for supported file system type
@@ -193,18 +210,23 @@ fi
 ################################################################################
 # save password hash of remoteadmin, if account is present
 
-if id $REMOTEADMIN &> /dev/null; then
- echo
- echo "####"
- echo "#### Backing up $REMOTEADMIN"
- echo "####"
+if [ -n "$REMOTEADMIN" ]; then
 
- echo -n " * saving password hash ..."
+ if id $REMOTEADMIN &> /dev/null; then
 
- if grep $REMOTEADMIN /etc/shadow | awk -F\: '{ print $2 }' > $REMOTEADMIN.hash; then
-  echo " OK!"
- else
-  echo " Failed!"
+  echo
+  echo "####"
+  echo "#### Backing up $REMOTEADMIN"
+  echo "####"
+
+  echo -n " * saving password hash ..."
+
+  if grep $REMOTEADMIN /etc/shadow | awk -F\: '{ print $2 }' > $REMOTEADMIN.hash; then
+   echo " OK!"
+  else
+   echo " Failed!"
+  fi
+
  fi
 
 fi

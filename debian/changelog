@@ -1,3 +1,12 @@
+linuxmuster-migration (1.1.9-0) precise; urgency=low
+
+  * linuxmuster-migration-backup:
+    - fixed backup of obsolete remoteadmin account (closes #258).
+    - added -f parameter to force skip of backup space computing (closes #259).
+  * defaults.conf: updated service names and fixed start/stop sequences (closes #189).
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Sat, 25 Jan 2014 13:25:48 +0100
+
 linuxmuster-migration (1.1.8-0) precise; urgency=low
 
   * linuxmuster-migration-restore.sh: fixing path in ovpn.cnf if there are OpenVPN certs to migrate (closes #200).
