@@ -1,7 +1,7 @@
 #
 # linuxmuster-migration-backup
 # thomas@linuxmuster.net
-# 25.01.2014
+# 26.01.2014
 #
 
 ################################################################################
@@ -39,6 +39,7 @@ if [ "$FORCE" = "yes" ]; then
  echo "#### Skipping backup space check"
  echo "####"
 
+ # filter out non existing files
  for i in $BACKUP; do
   [ -e "$i" ] && echo "$i" >> "$INCONFILTERED"
  done
@@ -242,11 +243,17 @@ echo "####"
 
 RC=0
 
+# make sure folder exists
+mkdir -p "$BACKUPFOLDER"
+
+# first sync with running services
+nice -n 19 rsync -a -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || true
+
 # stop services
 start_stop_services stop
 
-mkdir -p "$BACKUPFOLDER"
-rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || RC=1
+# second sync with stopped services
+nice -n -20 rsync -a -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || RC=1
 
 # start services again
 start_stop_services start

@@ -1,3 +1,10 @@
+linuxmuster-migration (1.1.10-0) precise; urgency=low
+
+  * linuxmuster-migration-backup: added addtitional filesystem sync with
+    runnning services to minimize downtime (closes #181).
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Sun, 26 Jan 2014 11:56:42 +0100
+
 linuxmuster-migration (1.1.9-0) precise; urgency=low
 
   * linuxmuster-migration-backup:
