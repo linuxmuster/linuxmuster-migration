@@ -1,7 +1,7 @@
 #
 # linuxmuster-migration-backup
 # thomas@linuxmuster.net
-# 26.01.2014
+# 28.01.2014
 #
 
 ################################################################################
@@ -247,13 +247,13 @@ RC=0
 mkdir -p "$BACKUPFOLDER"
 
 # first sync with running services
-nice -n 19 rsync -a -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || true
+nice -n 19 rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || true
 
 # stop services
 start_stop_services stop
 
 # second sync with stopped services
-nice -n -20 rsync -a -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || RC=1
+nice -n -20 rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || RC=1
 
 # start services again
 start_stop_services start

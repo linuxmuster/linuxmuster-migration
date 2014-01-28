@@ -1,3 +1,9 @@
+linuxmuster-migration (1.1.10-1) precise; urgency=low
+
+  * linuxmuster-migration-backup: fixed missing recursive parameter for rsync.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Tue, 28 Jan 2014 11:44:07 +0100
+
 linuxmuster-migration (1.1.10-0) precise; urgency=low
 
   * linuxmuster-migration-backup: added addtitional filesystem sync with
