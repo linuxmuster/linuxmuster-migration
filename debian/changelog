@@ -1,3 +1,20 @@
+linuxmuster-migration (1.1.12-0) precise-testing; urgency=low
+
+  * linuxmuster-migration-restore: 
+    - fixed -o parameter which was not accepted.
+    - added opsi setup and restore of workstations entry.
+  * defaults.conf: added tftpd-hpa to filtered packages, updated firewall test.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Tue, 08 Jul 2014 09:25:44 +0200
+
+linuxmuster-migration (1.1.11-0) precise-testing; urgency=low
+
+  * linuxmuster-migration-restore:
+    - fixed missing recursive parameter for rsync.
+    - added opsi support.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Sat, 31 May 2014 12:50:03 +0200
+
 linuxmuster-migration (1.1.10-1) precise; urgency=low
 
   * linuxmuster-migration-backup: fixed missing recursive parameter for rsync.
@@ -22,7 +39,7 @@ linuxmuster-migration (1.1.9-0) precise; urgency=low
 
 linuxmuster-migration (1.1.8-0) precise; urgency=low
 
-  * linuxmuster-migration-restore.sh: fixing path in ovpn.cnf if there are OpenVPN certs to migrate (closes #200).
+  * linuxmuster-migration-restore.sh: fixing path in ovpn.cnf if there arL!e OpenVPN certs to migrate (closes #200).
 
  -- Thomas Schmitt <thomas@linuxmuster.net>  Mon, 16 Sep 2013 12:21:32 +0200
 

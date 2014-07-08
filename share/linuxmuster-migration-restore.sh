@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 16.09.2013
+# 07.07.2014
 # GPL v3
 #
 
@@ -229,7 +229,7 @@ fi
 
 
 ################################################################################
-# firewall and other passwords
+# firewall and other passwords, opsi stuff
 
 echo
 echo "####"
@@ -260,6 +260,37 @@ if [ "$TARGETFW" = "ipcop" -o "$TARGETFW" = "ipfire" ]; then
  else
   error " Failed!"
  fi
+fi
+
+# opsi
+if [ -n "$opsiip" ]; then
+ if [ -n "$opsipw" ]; then
+  echo "Opsi password was already set on commandline."
+ else
+  while true; do
+   stty -echo
+   read -p "Please enter Opsi's root password: " opsipw; echo
+   stty echo
+   stty -echo
+   read -p "Please re-enter Opsi's root password: " opsipwre; echo
+   stty echo
+   [ "$opsipw" = "$opsipwre" ] && break
+   echo "Passwords do not match!"
+   sleep 2
+  done
+ fi
+ echo -n " * saving Opsi password ..."
+ # saves opsi password in debconf database
+ if RET=`echo set linuxmuster-base/opsipw "$opsipw" | debconf-communicate`; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
+ # save opsi workstations entry
+ opsientry="$(grep ^[a-zA-Z0-9] $WIMPORTDATA | grep ";$opsiip;" | tail -1)"
+ opsiroom="$(echo "$opsientry" | awk -F\; '{ print $1 }')"
+ opsigroup="$(echo "$opsientry" | awk -F\; '{ print $3 }')"
+ opsimac="$(echo "$opsientry" | awk -F\; '{ print $4 }')"
 fi
 
 # saves dummy password
@@ -520,6 +551,10 @@ if psql -U postgres template1 < "$PGSQLMETA" &> "$PGSQLMETA.log"; then
 else
  error " Failed! See $PGSQLMETA.log for details!"
 fi
+
+# sets servername in ldap db
+cp ldap.pgsql ldap.pgsql.bak
+sed -e 's|\\\\\\\\.*\\\\|\\\\\\\\'"$servername"'\\\\|g' -i ldap.pgsql
 
 # iterate over pgsql files
 for dbfile in *.pgsql; do
@@ -900,6 +935,17 @@ fi
 # upgrade configuration files
 upgrade_configs
 
+# restore opsi workstations entry
+. "$NETWORKSETTINGS"
+opsiip="$(echo $serverip | sed 's|.1.1|.1.2|')"
+if [ -n "$opsiroom" -a -n "$opsigroup" -a -n "$opsimac" -a -n "$opsiip" ]; then
+ if ! grep ^[a-zA-Z0-9] $WIMPORTDATA | grep -q ";$opsiip;"; then
+  echo "Restoring opsi's workstations entry."
+  opsientry="$opsiroom;opsi;$opsigroup;$opsimac;$opsiip;;1;1;1;0;0"
+  echo "$opsientry" >> $WIMPORTDATA
+ fi
+fi
+
 # repair permissions
 chown cyrus:mail /var/spool/cyrus -R
 chown cyrus:mail /var/lib/cyrus -R
@@ -967,6 +1013,12 @@ mkdir -p /etc/ldap/slapd.d
 chattr +i /var/lib/ldap/DB_CONFIG
 rm /var/lib/ldap/* &> /dev/null
 chattr -i /var/lib/ldap/DB_CONFIG
+
+# sets servername and basedn in sambaHomePath
+basedn_old="dc=$(grep /domainname "$BASEDATAFILE" | awk -F\: '{ print $2 }' | awk '{ print $1 }' | sed -e 's|\.|,dc=|g')"
+cp "$LDIF" "$LDIF.bak"
+sed -e 's|^sambaHomePath: \\\\.*\\|sambaHomePath: \\\\'"$servername"'\\|g
+        s|'"$basedn_old"'|'"$basedn"'|g' -i "$LDIF"
 
 # restore from ldif file
 echo -n " * adding $LDIF ..."
@@ -1430,7 +1482,23 @@ for i in $pkgs; do
 done
 
 # finally be sure workstations are up to date
+touch /tmp/.migration
 import_workstations
+rm -f /tmp/.migration
+
+# opsi setup
+if [ -n "$opsipw" ]; then
+ if ping -c 2 $opsiip &> /dev/null; then
+  linuxmuster-opsi --setup --first --password="$opsipw"
+  linuxmuster-opsi --wsimport --quiet
+  ssh "$opsiip" reboot
+ else
+  echo "Opsi is not available! Be sure to run"
+  echo "# linuxmuster-opsi --setup --first --reboot --password=<password>"
+  echo "ASAP after the migration is done."
+  sleep 10
+ fi
+fi
 
 # recreate aliases db
 newaliases

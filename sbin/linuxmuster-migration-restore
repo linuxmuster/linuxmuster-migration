@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # thomas@linuxmuster.net
-# 23.01.2013
+# 04.07.2014
 # GPL v3
 #
 
@@ -25,6 +25,8 @@ usage(){
  echo "                     where the restore files live)."
  echo " -i <password>       Firewall root password (optional). If not given you"
  echo "                     will be asked for it."
+ echo " -o <password>       Opsi root password (optional). If not given you"
+ echo "                     will be asked for it if Opsi is configured."
  echo " -t <temp dir>       Path to directory where the restore files are"
  echo "                     temporarily stored in case the source dir is on a"
  echo "                     nfs share (optional, must exist)."
@@ -34,11 +36,12 @@ usage(){
 
 
 # parse commandline arguments
-while getopts ":c:d:hi:t:" opt; do
+while getopts ":c:d:hi:o:t:" opt; do
  case $opt in
   c) ALTCONFDIR="$OPTARG" ;;
   d) SOURCEDIR="$OPTARG" ;;
   i) ipcoppw="$OPTARG" ;;
+  o) opsipw="$OPTARG" ;;
   t) NFSTMPDIR="$OPTARG" ;;
   h) usage ;;
   \?) echo "Invalid option: -$OPTARG" >&2
