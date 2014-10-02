@@ -255,6 +255,7 @@ fi
 echo
 echo "####"
 echo "#### Backing up filesystem"
+echo "#### `date`"
 echo "####"
 
 RC=0
@@ -268,6 +269,7 @@ nice -n 19 rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$B
 # stop services
 start_stop_services stop
 
+echo "#### `date`"
 # second sync with stopped services
 nice -n -20 rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || RC=1
 
@@ -279,7 +281,7 @@ if [ "$RC" = "0" ]; then
 else
  error "An error ocurred during backup!"
 fi
-
+echo "#### `date`"
 
 ################################################################################
 # dumping postgresql databases and users
