@@ -36,7 +36,12 @@ echo "####"
 sophomorix-bind --cron ; RC="$?"
 
 if [ "$RC" = "0" ]; then
- echo " OK!"
+    sophomorix-bind -i | grep home > /dev/null ; bind_mounts=$?
+    if [ "$bind_mounts" = "0" ]; then
+	echo "Warning: There are bind mounts in /home!"
+    else
+	echo " OK!"
+    fi
 else
  error " Failed!"
 fi
