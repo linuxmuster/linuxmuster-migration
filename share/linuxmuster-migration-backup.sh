@@ -26,6 +26,22 @@ fi
 
 
 ################################################################################
+# check if there is still some bind-mounts left over
+
+echo
+echo "####"
+echo "#### Checking and removing left over bind mounts"
+echo "####"
+
+sophomorix-bind --cron ; RC="$?"
+
+if [ "$RC" = "0" ]; then
+ echo " OK!"
+else
+ error " Failed!"
+fi
+
+################################################################################
 # computing needed backup space
 
 BACKUP="$(grep ^/ "$INCONFTMP")"
