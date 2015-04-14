@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 07.07.2014
+# 14.04.2015
 # GPL v3
 #
 
@@ -480,8 +480,8 @@ $SCRIPTSDIR/linuxmuster-patch --first
 ################################################################################
 # restore firewall settings
 
-# only for ipcop/ipfire
-if [ "$TARGETFW" != "custom" ]; then
+# only for ipfire
+if [ "$TARGETFW" = "ipfire" ]; then
 
  # if source and target are different and there are openvpn certs then restore only openvpn settings and certs
  if [ "$TARGETFW" = "$SOURCEFW" ]; then
@@ -522,7 +522,15 @@ if [ "$TARGETFW" != "custom" ]; then
   fi
 
   echo -n " * unpacking $FWARCHIVE ..."
-  if exec_ipcop "/bin/tar --exclude=etc/fstab -xzpf /var/linuxmuster/backup.tar.gz -C / && /sbin/reboot"; then
+  if exec_ipcop "/bin/tar --exclude=etc/fstab -xzpf /var/linuxmuster/backup.tar.gz -C /"; then
+   echo " OK!"
+  else
+   error " Failed!"
+  fi
+
+  echo -n " * repairing ssh connection and firewall settings ..."
+  ssh-keygen -f /root/.ssh/known_hosts -R [${ipcopip}]:222 2>> "$MIGRESTLOG" 1>> "$MIGRESTLOG"
+  if linuxmuster-ipfire --setup --password="$ipcoppw" 2>> "$MIGRESTLOG" 1>> "$MIGRESTLOG"; then
    echo " OK!"
   else
    error " Failed!"
@@ -648,8 +656,13 @@ echo "####"
 echo -n " * metadata ..."
 if mysql mysql < "$MYSQLMETA" &> "$MYSQLMETA.log"; then
  echo " OK!"
-else
- error " Error! See $MYSQLMETA.log for details!"
+else # try again with old credentials
+ cp -a filesystem/root/.my.cnf /root
+ if mysql mysql < "$MYSQLMETA" &> "$MYSQLMETA.log"; then
+  echo " OK!"
+ else
+  error " Error! See $MYSQLMETA.log for details!"
+ fi
 fi
 
 for dbfile in *.mysql; do
