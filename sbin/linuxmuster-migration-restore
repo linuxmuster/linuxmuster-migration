@@ -91,6 +91,7 @@ if [ -n "$RET" ]; then
   echo "NFSMNTDIR: $NFSMNTDIR" | tee -a "$MIGRESTLOG"
   echo "NFSTYPE:   $NFSTYPE" | tee -a "$MIGRESTLOG"
   error "NFS error!" | tee -a "$MIGRESTLOG"
+  exit 1
  fi
 fi
 
@@ -117,6 +118,7 @@ if [ -n "$NFSTYPE" ]; then
 
  if [ -z "$LOCALSRCDIR" ]; then
   error "There is not enough free space on the local filesystem! About $(( $ssum / 1024 )) MB are needed." | tee -a "$MIGRESTLOG"
+  exit 1
  fi
 
  mkdir -p "$LOCALSRCDIR" | tee -a "$MIGRESTLOG"
@@ -128,6 +130,7 @@ if [ -n "$NFSTYPE" ]; then
  else
   rm -rf "$LOCALSRCDIR"
   error " Failed!" | tee -a "$MIGRESTLOG"
+  exit 1
  fi
 
  SOURCEDIR="$LOCALSRCDIR"
@@ -149,6 +152,8 @@ cd "$SOURCEDIR"
 MIGEXUSER="$MIGCONFDIR/exclude.conf"
 MIGINUSER="$MIGCONFDIR/include.conf"
 concenate_configs || error " Failed!" | tee -a "$MIGRESTLOG"
+exit 1
+
 [ -n "$NFSTYPE" ] && echo "$SOURCEDIR" >> "$EXCONFTMP"
 
 
@@ -159,13 +164,14 @@ if [ -s "$MIGCONFDIR/custom.conf" ]; then
   echo " OK!" | tee -a "$MIGRESTLOG"
  else
   error " Failed!" | tee -a "$MIGRESTLOG"
+  exit 1
  fi
 fi
 
 
 # keep old internsubrange, we need it later if it has to be changed during migration
 internsubrange_old="$(echo get linuxmuster-base/internsubrange | debconf-communicate | awk '{ print $2 }')"
-[ -z "$internsubrange_old" ] && error "Cannot get internsubrange value from debconf!" | tee -a "$MIGRESTLOG"
+[ -z "$internsubrange_old" ] && error "Cannot get internsubrange value from debconf!" | tee -a "$MIGRESTLOG" && exit 1
 
 
 # source restore script

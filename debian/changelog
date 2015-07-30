@@ -1,3 +1,10 @@
+linuxmuster-migration (1.1.13-1) babo; urgency=low
+
+  * Added "exit 1" after each invocation of "error" to make shure the scripts
+    really are terminating on errors
+
+ -- frank <frank@linuxmuster.net>  Thu, 30 Jul 2015 21:13:32 +0200
+
 linuxmuster-migration (1.1.13-0) babo; urgency=low
 
   * linuxmuster-migration-restore: improvements concerning to ipfire settings
