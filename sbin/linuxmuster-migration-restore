@@ -151,8 +151,7 @@ cd "$SOURCEDIR"
 # concenate config files
 MIGEXUSER="$MIGCONFDIR/exclude.conf"
 MIGINUSER="$MIGCONFDIR/include.conf"
-concenate_configs || error " Failed!" | tee -a "$MIGRESTLOG"
-exit 1
+concenate_configs || error " Failed!" | tee -a "$MIGRESTLOG" && exit 1
 
 [ -n "$NFSTYPE" ] && echo "$SOURCEDIR" >> "$EXCONFTMP"
 
