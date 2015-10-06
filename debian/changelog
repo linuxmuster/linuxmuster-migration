@@ -1,3 +1,9 @@
+linuxmuster-migration (1.1.14-0) babo; urgency=low
+
+  * linuxmuster-migration-restore: fixed free space detection (closes #477).
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Tue, 06 Oct 2015 19:58:47 +0200
+
 linuxmuster-migration (1.1.13-0) babo; urgency=low
 
   * linuxmuster-migration-restore: improvements concerning to ipfire settings
