@@ -1,3 +1,16 @@
+linuxmuster-migration (1.2.0-1) babo62; urgency=low
+
+  * merged to master and rebuild.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Tue, 12 Jul 2016 09:15:23 +0200
+
+linuxmuster-migration (1.2.0-0) babo62; urgency=low
+
+  * added support for target version 6.2.
+  * firewall fixes (closes #521, #578).
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Mon, 11 Jul 2016 13:54:05 +0200
+
 linuxmuster-migration (1.1.14-0) babo; urgency=low
 
   * linuxmuster-migration-restore: fixed free space detection (closes #477).

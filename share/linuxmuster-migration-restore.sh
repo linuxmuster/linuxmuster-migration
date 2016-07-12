@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 14.04.2015
+# 20160711
 # GPL v3
 #
 
@@ -158,27 +158,6 @@ fi
 
 
 ################################################################################
-# save firewall's network settings
-
-# only for ipcop
-if [ "$TARGETFW" = "ipcop" -a "$SOURCEFW" = "ipcop" ]; then
-
- echo
- echo "####"
- echo "#### Saving $TARGETFW's external network settings"
- echo "####"
-
- echo -n " * downloading settings file ..."
- if get_ipcop /var/$TARGETFW/ethernet/settings $FWSETTINGS; then
-  echo " OK!"
- else
-  error " Failed!"
- fi
-
-fi # FWTYPE
-
-
-################################################################################
 # version check
 
 echo
@@ -229,7 +208,7 @@ fi
 
 
 ################################################################################
-# firewall and other passwords, opsi stuff
+# firewall and opsi passwords
 
 echo
 echo "####"
@@ -238,7 +217,7 @@ echo "####"
 
 if [ -n "$ipcoppw" ]; then
  echo "Firewall password was already set on commandline."
-elif [ "$TARGETFW" = "ipcop" -o "$TARGETFW" = "ipfire" ]; then
+elif [ "$TARGETFW" = "ipfire" ]; then
  while true; do
   stty -echo
   read -p "Please enter $TARGETFW's root password: " ipcoppw; echo
@@ -252,7 +231,7 @@ elif [ "$TARGETFW" = "ipcop" -o "$TARGETFW" = "ipfire" ]; then
  done
 fi
 
-if [ "$TARGETFW" = "ipcop" -o "$TARGETFW" = "ipfire" ]; then
+if [ "$TARGETFW" = "ipfire" ]; then
  echo -n " * saving firewall password ..."
  # saves firewall password in debconf database
  if RET=`echo set linuxmuster-base/ipcoppw "$ipcoppw" | debconf-communicate`; then
@@ -262,35 +241,29 @@ if [ "$TARGETFW" = "ipcop" -o "$TARGETFW" = "ipfire" ]; then
  fi
 fi
 
-# opsi
 if [ -n "$opsiip" ]; then
  if [ -n "$opsipw" ]; then
-  echo "Opsi password was already set on commandline."
+  echo "opsi password was already set on commandline."
  else
   while true; do
    stty -echo
-   read -p "Please enter Opsi's root password: " opsipw; echo
+   read -p "Please enter opsi's root password: " opsipw; echo
    stty echo
    stty -echo
-   read -p "Please re-enter Opsi's root password: " opsipwre; echo
+   read -p "Please re-enter opsi's root password: " opsipwre; echo
    stty echo
    [ "$opsipw" = "$opsipwre" ] && break
    echo "Passwords do not match!"
    sleep 2
   done
  fi
- echo -n " * saving Opsi password ..."
- # saves opsi password in debconf database
+ echo -n " * saving opsi password ..."
+ # saves firewall password in debconf database
  if RET=`echo set linuxmuster-base/opsipw "$opsipw" | debconf-communicate`; then
   echo " OK!"
  else
   error " Failed!"
  fi
- # save opsi workstations entry
- opsientry="$(grep ^[a-zA-Z0-9] $WIMPORTDATA | grep ";$opsiip;" | tail -1)"
- opsiroom="$(echo "$opsientry" | awk -F\; '{ print $1 }')"
- opsigroup="$(echo "$opsientry" | awk -F\; '{ print $3 }')"
- opsimac="$(echo "$opsientry" | awk -F\; '{ print $4 }')"
 fi
 
 # saves dummy password
@@ -331,8 +304,13 @@ write_aptconftweak(){
 write_aptconftweak
 
 # first do an upgrade
-aptitude update || exit 1
-aptitude -y dist-upgrade
+apt-get update || exit 1
+apt-get -y dist-upgrade
+
+# get packages for reinstalling later
+for i in linuxmuster-linbo atftpd; do
+ ( cd /var/cache/apt/archives && apt-get download "$i" )
+done
 
 # remove deinstalled packages from list
 SELTMP="/tmp/selections.$$"
@@ -352,9 +330,9 @@ done
 sed -e 's|^linuxmuster-pykota|linuxmuster-pk|
         s|nagios2|nagios3|g' -i "$SELTMP"
 
-# remove firewall packages from list
-[ "$CURRENTFW" = "ipfire" -o "$CURRENTFW" = "custom" ] && sed '/ipcop/d' -i "$SELTMP"
-[ "$CURRENTFW" = "ipcop" -o "$CURRENTFW" = "custom" ] && sed '/ipfire/d' -i "$SELTMP"
+# remove obsolete firewall packages from list
+sed '/ipcop/d' -i "$SELTMP"
+[ "$CURRENTFW" = "custom" ] && sed '/ipfire/d' -i "$SELTMP"
 
 # purge nagios stuff if migrating from prior versions to versions >= 6
 if [ "$MAINVERSION" -ge "6" -a "$OLDVERSION" \< "6" ]; then
@@ -363,7 +341,7 @@ if [ "$MAINVERSION" -ge "6" -a "$OLDVERSION" \< "6" ]; then
 fi
 
 # now install optional linuxmuster packages
-aptitude -y install `grep ^linuxmuster $SELTMP | awk '{ print $1 }'`
+apt-get -y install `grep ^linuxmuster $SELTMP | awk '{ print $1 }'`
 
 # remove linuxmuster pkgs from selections
 sed "/^linuxmuster/d" -i "$SELTMP"
@@ -400,6 +378,43 @@ fi
 
 
 ################################################################################
+# modify firewall ip if net address has changed
+
+internsubrange="$(echo get linuxmuster-base/internsubrange | debconf-communicate | awk '{ print $2 }')"
+
+# only for ipfire|ipcop
+if [ "$CURRENTFW" = "ipfire" -a "$internsubrange_old" != "$internsubrange" ]; then
+
+ echo
+ echo "####"
+ echo "#### Changing $CURRENTFW ip"
+ echo "####"
+
+ internsub=`echo $internsubrange | cut -f1 -d"-"`
+ internsub_old=`echo $internsubrange_old | cut -f1 -d"-"`
+
+ echo -n " * changing from 10.$internsub_old.1.254 to 10.$internsub.1.254 ..."
+ if exec_ipcop /var/linuxmuster/patch-ips.sh $internsub_old $internsub; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
+
+ echo -n " * removing old authorized_keys file and reboot ..."
+ if exec_ipcop "/bin/rm -f /root/.ssh/authorized_keys && /sbin/reboot"; then
+  echo " OK!"
+ else
+  error " Failed!"
+ fi
+
+ echo -n " * waiting 120 seconds ... "
+ sleep 120
+ echo "OK!"
+
+fi
+
+
+################################################################################
 # restore samba sid
 
 echo
@@ -415,55 +430,6 @@ smbpasswd -w `cat /etc/ldap.secret`
 
 
 ################################################################################
-# prepare firewall ssh connection
-
-# only for ipfire|ipcop
-if [ "$CURRENTFW" != "custom" ]; then
-
- echo
- echo "####"
- echo "#### Preparing $CURRENTFW for ssh connection"
- echo "####"
-
- # change ips on firewall if internal network has changed
- internsubrange="$(echo get linuxmuster-base/internsubrange | debconf-communicate | awk '{ print $2 }')"
- if [ "$internsubrange_old" != "$internsubrange" ]; then
-
-  internsub=`echo $internsubrange | cut -f1 -d"-"`
-  internsub_old=`echo $internsubrange_old | cut -f1 -d"-"`
-
-  echo -n " * changing network address from 10.$internsub_old to 10.$internsub ..."
-  if exec_ipcop /var/linuxmuster/patch-ips.sh $internsub_old $internsub; then
-   echo " OK!"
-  else
-   error " Failed!"
-  fi
-
-  echo -n " * moving away authorized_keys file and trying to reboot ..."
-  if exec_ipcop "/bin/rm -f /root/.ssh/authorized_keys && /sbin/reboot"; then
-   echo " OK!"
-  else
-   error " Failed!"
-  fi
-
-  echo " * rebooting, please wait 60s."
-  sleep 60
-
- else
-
-  echo -n  " * moving away authorized_keys file ..."
-  if exec_ipcop /bin/rm -f /root/.ssh/authorized_keys; then
-   echo " OK!"
-  else
-   error " Failed!"
-  fi
-
- fi
-
-fi # custom
-
-
-################################################################################
 # linuxmuster-setup
 
 echo
@@ -475,73 +441,6 @@ $SCRIPTSDIR/linuxmuster-patch --first
 
 # refresh environment
 . $HELPERFUNCTIONS
-
-
-################################################################################
-# restore firewall settings
-
-# only for ipfire
-if [ "$TARGETFW" = "ipfire" ]; then
-
- # if source and target are different and there are openvpn certs then restore only openvpn settings and certs
- if [ "$TARGETFW" = "$SOURCEFW" ]; then
-  ovpnmsg="complete $SOURCEFW settings"
- else
-  ovpncerts="$(tar -O -xzf $FWARCHIVE var/$SOURCEFW/ovpn/ovpnconfig | wc -l)"
-  if [ $ovpncerts -gt 0 ]; then
-   # extract openvpn stuff from archive and create a new one
-   ovpnmsg="$SOURCEFW openvpn settings"
-   curdir="$(pwd)"
-   tmpdir="/var/tmp/migration.$$"
-   mkdir -p "$tmpdir"
-   tar -xzpf "$FWARCHIVE" -C "$tmpdir"
-   cd "$tmpdir"
-   mkdir -p "var/$TARGETFW"
-   mv "var/$SOURCEFW/ovpn" "var/$TARGETFW"
-   sed -e "s|$SOURCEFW|$TARGETFW|g" -i "var/$TARGETFW/ovpn/server.conf"
-   [ -s "var/$TARGETFW/ovpn/openssl/ovpn.cnf" ] && sed -e "s|$SOURCEFW|$TARGETFW|g" -i "var/$TARGETFW/ovpn/openssl/ovpn.cnf"
-   FWARCHIVE="/tmp/ovpn.$$.tar.gz"
-   tar -czpf "$FWARCHIVE" "var/$TARGETFW"
-   cd "$curdir"
-   rm -rf "$tmpdir"
-  fi
- fi
-
- if [ -n "$ovpnmsg" ]; then
-
-  echo
-  echo "####"
-  echo "#### Restoring $ovpnmsg"
-  echo "####"
-
-  echo -n " * uploading $FWARCHIVE ..."
-  if put_ipcop "$FWARCHIVE" /var/linuxmuster/backup.tar.gz; then
-   echo " OK!"
-  else
-   error " Failed!"
-  fi
-
-  echo -n " * unpacking $FWARCHIVE ..."
-  if exec_ipcop "/bin/tar --exclude=etc/fstab -xzpf /var/linuxmuster/backup.tar.gz -C /"; then
-   echo " OK!"
-  else
-   error " Failed!"
-  fi
-
-  echo -n " * repairing ssh connection and firewall settings ..."
-  ssh-keygen -f /root/.ssh/known_hosts -R [${ipcopip}]:222 2>> "$MIGRESTLOG" 1>> "$MIGRESTLOG"
-  if linuxmuster-ipfire --setup --password="$ipcoppw" 2>> "$MIGRESTLOG" 1>> "$MIGRESTLOG"; then
-   echo " OK!"
-  else
-   error " Failed!"
-  fi
-
-  echo " * rebooting, please wait 120s."
-  sleep 120
-
- fi # ovpnmsg
-
-fi # TARGETFW
 
  
 ################################################################################
@@ -718,33 +617,8 @@ fi
 write_aptconftweak
 
 # install additional packages from list
-aptitude -y install `awk '{ print $1 }' $SELTMP`
+apt-get -y install `awk '{ print $1 }' $SELTMP`
 rm "$SELTMP"
-
-
-################################################################################
-# only for ipfire: repeat ssh connection stuff
-
-if [ "$TARGETFW" = "ipfire" ]; then
- 
- # only if ssh link works
- if ssh -oNumberOfPasswordPrompts=0 -oStrictHostKeyChecking=no -p222 $ipcopip "echo -n"; then
-
-  echo
-  echo "####"
-  echo "#### Preparing once more $TARGETFW for ssh connection"
-  echo "####"
-
-  echo -n  " * moving away authorized_keys file ..."
-  if exec_ipcop /bin/rm -f /root/.ssh/authorized_keys; then
-   echo " OK!"
-  else
-   error " Failed!"
-  fi
- 
- fi
- 
-fi
 
 
 ################################################################################
@@ -948,17 +822,6 @@ fi
 # upgrade configuration files
 upgrade_configs
 
-# restore opsi workstations entry
-. "$NETWORKSETTINGS"
-opsiip="$(echo $serverip | sed 's|.1.1|.1.2|')"
-if [ -n "$opsiroom" -a -n "$opsigroup" -a -n "$opsimac" -a -n "$opsiip" ]; then
- if ! grep ^[a-zA-Z0-9] $WIMPORTDATA | grep -q ";$opsiip;"; then
-  echo "Restoring opsi's workstations entry."
-  opsientry="$opsiroom;opsi;$opsigroup;$opsimac;$opsiip;;1;1;1;0;0"
-  echo "$opsientry" >> $WIMPORTDATA
- fi
-fi
-
 # repair permissions
 chown cyrus:mail /var/spool/cyrus -R
 chown cyrus:mail /var/lib/cyrus -R
@@ -981,6 +844,25 @@ fi
 
 
 ################################################################################
+# restore opsi stuff after sync
+
+if [ -n "$opsiip" -a -n "$opsipw" -a -s "$CACHEDIR/workstations.opsi" ]; then
+
+ echo
+ echo "####"
+ echo "#### opsi restore"
+ echo "####"
+
+ # opsi workstation data after sync
+ grep -v ^# "$WIMPORTDATA" | grep -qw "$opsiip" || cat "$CACHEDIR/workstations.opsi" >> "$WIMPORTDATA"
+
+ # opsi ssh
+ linuxmuster-opsi --setup --password="$opsipw" --quiet
+
+fi
+
+
+################################################################################
 # only for ipfire: repeat ssh connection stuff part 2
 # meanwhile root's ssh key has changed
 
@@ -988,20 +870,13 @@ if [ "$TARGETFW" = "ipfire" ]; then
 
  echo
  echo "####"
- echo "#### Restoring $TARGETFW ssh connection"
+ echo "#### $TARGETFW setup"
  echo "####"
 
- echo -n  " * uploading root's ssh key ... "
- mykey="$(cat /root/.ssh/id_dsa.pub)"
- [ -z "$mykey" ] && error
- if [ -s /root/.ssh/known_hosts ]; then
-  for i in ipfire ipcop "$ipcopip"; do
-   ssh-keygen -f "/root/.ssh/known_hosts" -R ["$i"]:222 &> /dev/null
-  done
- fi
- # upload root's public key
- echo "$ipcoppw" | "$SCRIPTSDIR/sshaskpass.sh" ssh -oStrictHostKeyChecking=no -p222 "$ipcopip" "mkdir -p /root/.ssh && echo "$mykey" > /root/.ssh/authorized_keys"
- 
+ linuxmuster-ipfire --setup --first --password="$ipcoppw"
+
+ wait_for_fw
+
 fi
 
 
@@ -1070,38 +945,12 @@ chown -R openldap:openldap /etc/ldap
 ################################################################################
 # reinstall linbo, perhaps it was overwritten
 
-imaging="$(echo get linuxmuster-base/imaging | debconf-communicate | awk '{ print $2 }')"
+echo
+echo "####"
+echo "#### Reinstalling LINBO"
+echo "####"
 
-if [ "$imaging" = "linbo" -o "$MAINVERSION" = "6" ]; then
-
- echo
- echo "####"
- echo "#### Reinstalling LINBO"
- echo "####"
-
- aptitude -y reinstall linuxmuster-linbo
-
-fi
-
-
-################################################################################
-# recreate remoteadmin (not on linuxmuster.net >= 6.0)
-
-if [ -s "$REMOTEADMIN.hash" -a $MAINVERSION -lt 6 ]; then
-
- echo
- echo "####"
- echo "#### Recreating $REMOTEADMIN"
- echo "####"
-
- id $REMOTEADMIN &> /dev/null || NOPASSWD=yes linuxmuster-remoteadmin --create
- cp /etc/shadow shadow.tmp
- sed -e "s|^$REMOTEADMIN\:\!\:|$REMOTEADMIN\:$(cat $REMOTEADMIN.hash)\:|" shadow.tmp > /etc/shadow
- rm -f shadow.tmp
- chown root:shadow /etc/shadow
- chmod 640 /etc/shadow
-
-fi
+apt-get -y --reinstall install linuxmuster-linbo
 
 
 ################################################################################
@@ -1272,6 +1121,7 @@ if [ -e "$CUSTOMFLAG" ]; then
  if [ -n "$changed" ]; then
   echo "Applying setup modifications, starting linuxmuster-setup (modify) ..."
   RET=`echo set linuxmuster-base/ipcoppw "$ipcoppw" | debconf-communicate`
+  [ -n "$opsipw" ] && RET=`echo set linuxmuster-base/opsipw "$opsipw" | debconf-communicate`
 
   $SCRIPTSDIR/linuxmuster-patch --modify
  fi
@@ -1469,6 +1319,9 @@ echo "####"
 echo "#### Final tasks"
 echo "####"
 
+apt-get clean
+apt-get -y autoremove
+
 echo -n "removing apt's unattended config ..."
 rm -f "$APTCONFTWEAK"
 echo " OK!"
@@ -1495,23 +1348,10 @@ for i in $pkgs; do
 done
 
 # finally be sure workstations are up to date
-touch /tmp/.migration
+rm -f "$ROOM_SHARE_ACLS"
+#touch /tmp/.migration
 import_workstations
-rm -f /tmp/.migration
-
-# opsi setup
-if [ -n "$opsipw" ]; then
- if ping -c 2 $opsiip &> /dev/null; then
-  linuxmuster-opsi --setup --first --password="$opsipw"
-  linuxmuster-opsi --wsimport --quiet
-  ssh "$opsiip" reboot
- else
-  echo "Opsi is not available! Be sure to run"
-  echo "# linuxmuster-opsi --setup --first --reboot --password=<password>"
-  echo "ASAP after the migration is done."
-  sleep 10
- fi
-fi
+#rm -f /tmp/.migration
 
 # recreate aliases db
 newaliases

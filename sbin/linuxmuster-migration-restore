@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # thomas@linuxmuster.net
-# 06.10.2015
+# 20160711
 # GPL v3
 #
 
@@ -66,18 +66,15 @@ fi
 # delete old logfile
 rm -f "$MIGRESTLOG"
 
-# logging
-exec >>$MIGRESTLOG 2>&1
-
 # print script header info
 echo
-echo "####"
-echo "#### Starting restore of migration data"
-echo "#### Sourcedir: $SOURCEDIR"
-echo "#### Configdir: $MIGCONFDIR"
-[ -n "$NFSTMPDIR" ] && echo "#### NFS-Tempdir: $NFSTMPDIR"
-echo "#### `date`"
-echo "####"
+echo "####" | tee -a "$MIGRESTLOG"
+echo "#### Starting restore of migration data" | tee -a "$MIGRESTLOG"
+echo "#### Sourcedir: $SOURCEDIR" | tee -a "$MIGRESTLOG"
+echo "#### Configdir: $MIGCONFDIR" | tee -a "$MIGRESTLOG"
+[ -n "$NFSTMPDIR" ] && echo "#### NFS-Tempdir: $NFSTMPDIR" | tee -a "$MIGRESTLOG"
+echo "#### `date`" | tee -a "$MIGRESTLOG"
+echo "####" | tee -a "$MIGRESTLOG"
 
 # nfs check
 RET="$(nfs_check)"
@@ -87,12 +84,12 @@ if [ -n "$RET" ]; then
  NFSTYPE="$(echo "$RET" | awk '{ print $3 }')"
 
  if [ -n "$NFSSHARE" -a -n "$NFSMNTDIR" -a -n "$NFSTYPE" ]; then
-  echo "$NFSTYPE filesystem $NFSSHARE is mounted on $NFSMNTDIR."
+  echo "$NFSTYPE filesystem $NFSSHARE is mounted on $NFSMNTDIR." | tee -a "$MIGRESTLOG"
  else
-  echo "NFSSHARE:  $NFSSHARE"
-  echo "NFSMNTDIR: $NFSMNTDIR"
-  echo "NFSTYPE:   $NFSTYPE"
-  error "NFS error!"
+  echo "NFSSHARE:  $NFSSHARE" | tee -a "$MIGRESTLOG"
+  echo "NFSMNTDIR: $NFSMNTDIR" | tee -a "$MIGRESTLOG"
+  echo "NFSTYPE:   $NFSTYPE" | tee -a "$MIGRESTLOG"
+  error "NFS error!" | tee -a "$MIGRESTLOG"
  fi
 fi
 
@@ -118,18 +115,18 @@ if [ -n "$NFSTYPE" ]; then
  done
 
  if [ -z "$LOCALSRCDIR" ]; then
-  error "There is not enough free space on the local filesystem! About $(( $ssum / 1024 )) MB are needed."
+  error "There is not enough free space on the local filesystem! About $(( $ssum / 1024 )) MB are needed." | tee -a "$MIGRESTLOG"
  fi
 
  mkdir -p "$LOCALSRCDIR"
- echo -n "Copying about $(( $ssum / 1024 )) MB data to $LOCALSRCDIR ... be patient ..."
+ echo -n "Copying about $(( $ssum / 1024 )) MB data to $LOCALSRCDIR ... be patient ..." | tee -a "$MIGRESTLOG"
  RC=0
  rsync -a -v --delete "$SOURCEDIR/" "$LOCALSRCDIR/" || RC=1
  if [ "$RC" = "0" ]; then
-  echo " OK!"
+  echo " OK!" | tee -a "$MIGRESTLOG"
  else
   rm -rf "$LOCALSRCDIR"
-  error " Failed!"
+  error " Failed!" | tee -a "$MIGRESTLOG"
  fi
 
  SOURCEDIR="$LOCALSRCDIR"
@@ -151,16 +148,16 @@ cd "$SOURCEDIR"
 MIGEXUSER="$MIGCONFDIR/exclude.conf"
 MIGINUSER="$MIGCONFDIR/include.conf"
 concenate_configs || error " Failed!"
-[ -n "$NFSTYPE" ] && echo "$SOURCEDIR" >> "$EXCONFTMP"
+[ -n "$NFSTYPE" ] && echo "$SOURCEDIR" >> "$EXCONFTMP" | tee -a "$MIGRESTLOG"
 
 
 # check for custom.conf and read it
 if [ -s "$MIGCONFDIR/custom.conf" ]; then
- echo -n "Reading $MIGCONFDIR/custom.conf ..."
+ echo -n "Reading $MIGCONFDIR/custom.conf ..." | tee -a "$MIGRESTLOG"
  if . "$MIGCONFDIR/custom.conf"; then
-  echo " OK!"
+  echo " OK!" | tee -a "$MIGRESTLOG"
  else
-  error " Failed!"
+  error " Failed!" | tee -a "$MIGRESTLOG"
  fi
 fi
 
@@ -171,7 +168,7 @@ internsubrange_old="$(echo get linuxmuster-base/internsubrange | debconf-communi
 
 
 # source restore script
-. "$MIGDATADIR/linuxmuster-migration-restore.sh" 2>&1
+. "$MIGDATADIR/linuxmuster-migration-restore.sh" 2>&1 | tee -a "$MIGRESTLOG"
 cp "$MIGRESTLOG" "$SOURCEDIR"
 
 
