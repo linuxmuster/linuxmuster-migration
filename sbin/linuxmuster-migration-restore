@@ -164,7 +164,7 @@ fi
 
 # keep old internsubrange, we need it later if it has to be changed during migration
 internsubrange_old="$(echo get linuxmuster-base/internsubrange | debconf-communicate | awk '{ print $2 }')"
-[ -z "$internsubrange_old" ] && error "Cannot get internsubrange value from debconf!"
+[ -z "$internsubrange_old" ] && { error "Cannot get internsubrange value from debconf!" && exit 1 ; }
 
 
 # source restore script
