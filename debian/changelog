@@ -1,3 +1,9 @@
+linuxmuster-migration (1.2.1-0) babo62; urgency=low
+
+  * fixes due to linuxmuster-linbo >= 2.3.12 (change from atftpd to tftpd-hpa).
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Mon, 24 Oct 2016 15:20:49 +0200
+
 linuxmuster-migration (1.2.0-1) babo62; urgency=low
 
   * merged to master and rebuild.

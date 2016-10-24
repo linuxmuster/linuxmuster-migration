@@ -1,6 +1,6 @@
 #
 # thomas@linuxmuster.net
-# 20160711
+# 20161023
 # GPL v3
 #
 
@@ -305,10 +305,10 @@ write_aptconftweak
 
 # first do an upgrade
 apt-get update || exit 1
-apt-get -y dist-upgrade
+apt-get -y dist-upgrade || apt-get -fy dist-upgrade
 
 # get packages for reinstalling later
-for i in linuxmuster-linbo atftpd; do
+for i in linuxmuster-linbo linuxmuster-linbo-common tftpd-hpa; do
  ( cd /var/cache/apt/archives && apt-get download "$i" )
 done
 
