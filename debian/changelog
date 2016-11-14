@@ -1,3 +1,11 @@
+linuxmuster-migration (1.2.2-0) babo62; urgency=low
+
+  * merged jollyzsher pr #1: add bind umount fixes and date output.
+  * merged jollyzsher pr #2: add source version 6.2.
+  * merged jollyzsher pr #3: correct the exit strategy.
+
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Mon, 14 Nov 2016 09:31:00 +0100
+
 linuxmuster-migration (1.2.1-0) babo62; urgency=low
 
   * fixes due to linuxmuster-linbo >= 2.3.12 (change from atftpd to tftpd-hpa).
