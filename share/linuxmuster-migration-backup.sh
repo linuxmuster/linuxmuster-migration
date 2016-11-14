@@ -26,6 +26,27 @@ fi
 
 
 ################################################################################
+# check if there is still some bind-mounts left over
+
+echo
+echo "####"
+echo "#### Checking and removing left over bind mounts"
+echo "####"
+
+sophomorix-bind --cron ; RC="$?"
+
+if [ "$RC" = "0" ]; then
+    sophomorix-bind -i | grep home > /dev/null ; bind_mounts=$?
+    if [ "$bind_mounts" = "0" ]; then
+	echo "Warning: There are bind mounts in /home!"
+    else
+	echo " OK!"
+    fi
+else
+ error " Failed!"
+fi
+
+################################################################################
 # computing needed backup space
 
 BACKUP="$(grep ^/ "$INCONFTMP")"
@@ -239,6 +260,7 @@ fi
 echo
 echo "####"
 echo "#### Backing up filesystem"
+echo "#### `date`"
 echo "####"
 
 RC=0
@@ -252,6 +274,7 @@ nice -n 19 rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$B
 # stop services
 start_stop_services stop
 
+echo "#### `date`"
 # second sync with stopped services
 nice -n -20 rsync -a -r -v --delete --delete-excluded "$INPARAM" "$EXPARAM" / "$BACKUPFOLDER/" || RC=1
 
@@ -263,7 +286,7 @@ if [ "$RC" = "0" ]; then
 else
  error "An error ocurred during backup!"
 fi
-
+echo "#### `date`"
 
 ################################################################################
 # dumping postgresql databases and users
