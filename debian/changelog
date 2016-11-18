@@ -2,7 +2,7 @@ linuxmuster-migration (1.2.3-0) babo62; urgency=low
 
   * merged jollyzsher pr #4: Update exclude.conf: avoid whitespace in filenames.
 
- -- Thomas Schmitt <thomas@linuxmuster.net>  Mon, 14 Nov 2016 09:31:00 +0100
+ -- Thomas Schmitt <thomas@linuxmuster.net>  Fri, 18 Nov 2016 17:26:55 +0100
 
 linuxmuster-migration (1.2.2-0) babo62; urgency=low
 
